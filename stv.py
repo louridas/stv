@@ -37,8 +37,17 @@ import logging
 import sys
 
 SVT_LOGGER = 'SVT'
-LOGGER_FORMAT = '%(message)s'
+LOGGER_FORMAT = '%(levelname)s %(message)s'
+LOG_MESSAGE = "{action} {desc}"
 
+class Action:
+    COUNT_ROUND = "ROUND"
+    TRANSFER = "TRANSFER"
+    DELETE = "DELETE"
+    ELECT = "ELECT"
+    COUNT = "COUNT"
+    RANDOM = "RANDOM"
+    
 logging.basicConfig(format=LOGGER_FORMAT)
 logging.getLogger(SVT_LOGGER).setLevel(logging.INFO)
 
@@ -87,6 +96,9 @@ def randomly_select_first(sequence, key):
         else:
             break
     random_index = int(random()*(len(collected)))
+    selected = collected[random_index]
+    logger = logging.getLogger(SVT_LOGGER)
+    logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=selected))
     return collected[random_index]
         
     
@@ -101,6 +113,7 @@ def redistribute_ballots(selected, hopefuls, allocated, weight):
 
     logger = logging.getLogger(SVT_LOGGER)
     transferred = []
+    moves = {}
 
     for ballot in allocated[selected]:
         reallocated = False
@@ -115,11 +128,18 @@ def redistribute_ballots(selected, hopefuls, allocated, weight):
                 else:
                     allocated[recipient] = [ballot]
                 reallocated = True
-                logger.info('T' + ' ' + selected + '->' + recipient
-                            + ' (' + str(weight) + ')')
+                if (selected, recipient) in moves:
+                    moves[(selected, recipient)] += 1
+                else:
+                    moves[(selected, recipient)] = 1
                 transferred.append(ballot)
             else:
                 i += 1
+    for move, times in moves.iteritems():
+        description =  "{0} -> {1} {2}*{3}={4}".format(move[0], move[1], times,
+                                                       weight, times*weight)
+        logger.info(LOG_MESSAGE.format(action=Action.TRANSFER,
+                                       desc=description))
     allocated[selected][:] = [x for x in allocated[selected]
                               if x not in transferred ]
     
@@ -135,13 +155,14 @@ def count_stv(ballots, seats):
 
     seed()
 
-    round = 1
+    current_round = 1
     threshold = int(len(ballots) / (seats + 1)) + 1
 
     logger = logging.getLogger(SVT_LOGGER)
     
     # First round
-    logger.info('R ' + str(round))
+    logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
+                                   desc=current_round))
     for ballot in ballots:
         selected = ballot.candidates[0]
         for candidate in ballot.candidates:
@@ -160,21 +181,24 @@ def count_stv(ballots, seats):
 
     # Log initial count
     for candidate in candidates:
-        logger.info('C ' + candidate + '=' + str(vote_count[candidate]))
-        
+        description = "{0} = {1}".format(candidate, vote_count[candidate])
+        logger.info(LOG_MESSAGE.format(action=Action.COUNT,
+                                       desc=description))
     for (candidate, ballots) in allocated.iteritems():
         if len(ballots) >= threshold:
             hopefuls.remove(candidate)
             elected.append(candidate)
-            logger.info('E ' + candidate)
+            logger.info(LOG_MESSAGE.format(action=Action.ELECT,
+                                           desc=candidate))
 
     # Subsequent rounds
     # Check if the number of seats left is bigger than the number of
     # hopefuls; if so, all hopefuls will be elected
     elect_all = seats - len(elected) >= len(hopefuls)
     while len(elected) < seats and not elect_all:
-        round += 1
-        logger.info('R ' + str(round))
+        current_round += 1
+        logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
+                                       desc=current_round))
         vote_count_sorted = sorted(vote_count.iteritems(), key=itemgetter(1),
                                    reverse=True)
         best_candidate = randomly_select_first(vote_count_sorted,
@@ -200,7 +224,8 @@ def count_stv(ballots, seats):
             hopefuls_sorted = sorted(hopefuls, key=vote_count.get)
             worst_candidate = randomly_select_first(hopefuls_sorted,
                                                     key=vote_count.get)
-            logger.info('D ' + worst_candidate)
+            logger.info(LOG_MESSAGE.format(action=Action.DELETE,
+                                           desc=worst_candidate))
             redistribute_ballots(worst_candidate, hopefuls, allocated, 1)
             hopefuls.remove(worst_candidate)
         # Calculate new votes and move from hopefuls to elected as necessary
@@ -211,7 +236,8 @@ def count_stv(ballots, seats):
             if vote_count[hopeful] >= threshold:
                 elected.append(hopeful)
                 transferred.append(hopeful)
-                logger.info('E ' + hopeful)
+                logger.info(LOG_MESSAGE.format(action=Action.ELECT,
+                                               desc=hopeful))
         hopefuls[:] = [x for x in hopefuls if x not in transferred ]
         elect_all = seats - len(elected) >= len(hopefuls)
 
@@ -219,10 +245,11 @@ def count_stv(ballots, seats):
     if elect_all:
         for hopeful in hopefuls:
             elected.append(hopeful)
-            logger.info('E ' + hopeful)
+            logger.info(LOG_MESSAGE.format(action=Action.ELECT,
+                                           desc=hopeful))
         hopefuls = []
 
-    return elected
+    return elected, vote_count
 
 if __name__ == "__main__":
     ballots = []
@@ -237,8 +264,8 @@ if __name__ == "__main__":
     ballots.append(Ballot(("Strawberry",)))
     ballots.append(Ballot(("Sweets",)))
 
-    elected = count_stv(ballots, 3)
+    (elected, vote_count) = count_stv(ballots, 3)
 
     print "Results:"
     for candidate in elected:
-        print candidate
+        print candidate, vote_count[candidate]
