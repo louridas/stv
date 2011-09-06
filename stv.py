@@ -31,7 +31,6 @@
 # GRNET S.A.
 
 from operator import mul, itemgetter
-from fractions import Fraction
 from random import random, seed
 import logging
 import sys
