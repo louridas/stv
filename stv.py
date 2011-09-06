@@ -268,6 +268,7 @@ def count_stv(ballots, seats):
     return elected, vote_count
 
 if __name__ == "__main__":
+    # Test data from http://en.wikipedia.org/wiki/Single_transferable_vote
     ballots = []
     for i in range(4):
         ballots.append(Ballot(("Orange",)))
