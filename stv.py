@@ -206,8 +206,6 @@ def count_stv(ballots, seats):
     elect_all = seats - len(elected) >= len(hopefuls)
     while len(elected) < seats and not elect_all:
         current_round += 1
-        if (current_round == 10):
-            sys.exit(1)
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
                                        desc=current_round))
         # Filter candidates with surplus votes. These do not contain
