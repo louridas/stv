@@ -63,9 +63,9 @@ class Ballot:
     """
 
     candidates = []
-    weights = [1]
+    weights = [1.0]
     index = 0
-    _value = 1
+    _value = 1.0
 
     def __init__(self, candidates=[]):
         self.candidates = candidates
@@ -216,7 +216,7 @@ def count_stv(ballots, seats):
                                                    action=Action.ELECT)
             surplus = vote_count[best_candidate] - threshold
             # Calculate the weight for this round
-            weight = Fraction(surplus, vote_count[best_candidate])
+            weight = float(surplus) / vote_count[best_candidate]
             # Adjust the vote count for the best candidate to the threshold
             # (the vote count does not matter, as the candidate is already
             # elected).
