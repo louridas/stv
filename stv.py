@@ -104,12 +104,14 @@ def randomly_select_first(sequence, key, action):
     return collected[random_index]
         
     
-def redistribute_ballots(selected, hopefuls, allocated, weight):
+def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
     """Redistributes the ballots from selected to the hopefuls.
 
     Redistributes the ballots currently allocated to the selected
     candidate. The ballots are redistributed with the given weight.
-    The total ballot allocation is given by the allocated dict.
+    The total ballot allocation is given by the allocated dict. The current
+    vote count is given by vote_count and is adjusted according to the
+    redistribution.
     
     """
 
@@ -129,6 +131,10 @@ def redistribute_ballots(selected, hopefuls, allocated, weight):
                     allocated[recipient].append(ballot)
                 else:
                     allocated[recipient] = [ballot]
+                if recipient in vote_count:
+                    vote_count[recipient] += (1 * weight)
+                else:
+                    vote_count[recipient] = 1 * weight
                 reallocated = True
                 if (selected, recipient) in moves:
                     moves[(selected, recipient)] += 1
@@ -144,6 +150,7 @@ def redistribute_ballots(selected, hopefuls, allocated, weight):
                                        desc=description))
     allocated[selected][:] = [x for x in allocated[selected]
                               if x not in transferred ]
+    vote_count[selected] -= (len(transferred) * weight)
     
 def count_stv(ballots, seats):
     """Performs a SVT vote for the given ballots and number of seats.
@@ -199,6 +206,8 @@ def count_stv(ballots, seats):
     elect_all = seats - len(elected) >= len(hopefuls)
     while len(elected) < seats and not elect_all:
         current_round += 1
+        if (current_round == 10):
+            sys.exit(1)
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
                                        desc=current_round))
         # Filter candidates with surplus votes. These do not contain
@@ -216,14 +225,11 @@ def count_stv(ballots, seats):
             surplus = vote_count[best_candidate] - threshold
             # Calculate the weight for this round
             weight = float(surplus) / vote_count[best_candidate]
-            # Adjust the vote count for the best candidate to the threshold
-            # (the vote count does not matter, as the candidate is already
-            # elected).
-            vote_count[best_candidate] = threshold
             # Find the next eligible preference for each one of the ballots
             # cast for the candidate, and transfer the vote to that
             # candidate with its value adjusted by the correct weight.
-            redistribute_ballots(best_candidate, hopefuls, allocated, weight)
+            redistribute_ballots(best_candidate, hopefuls, allocated, weight,
+                                 vote_count)
         # If there is no surplus, take the least hopeful candidate
         # (i.e., the hopeful candidate with the less votes) and
         # redistribute that candidate's votes.
@@ -234,13 +240,12 @@ def count_stv(ballots, seats):
                                                     action=Action.ELIMINATE)
             logger.info(LOG_MESSAGE.format(action=Action.ELIMINATE,
                                            desc=worst_candidate))
-            redistribute_ballots(worst_candidate, hopefuls, allocated, 1)
+            redistribute_ballots(worst_candidate, hopefuls, allocated, 1.0,
+                                 vote_count)
             hopefuls.remove(worst_candidate)
-        # Calculate new votes and move from hopefuls to elected as necessary
+        # Move from hopefuls to elected as necessary
         transferred = []
         for hopeful in hopefuls:
-            vote_count[hopeful] = sum([x.get_value()
-                                       for x in allocated[hopeful]])
             if vote_count[hopeful] >= threshold:
                 elected.append(hopeful)
                 transferred.append(hopeful)
