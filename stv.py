@@ -40,12 +40,13 @@ LOGGER_FORMAT = '%(levelname)s %(message)s'
 LOG_MESSAGE = "{action} {desc}"
 
 class Action:
-    COUNT_ROUND = "ROUND"
-    TRANSFER = "TRANSFER"
-    ELIMINATE = "ELIMINATE"
-    ELECT = "ELECT"
-    COUNT = "COUNT"
-    RANDOM = "RANDOM"
+    COUNT_ROUND = "@ROUND"
+    TRANSFER = ">TRANSFER"
+    ELIMINATE = "-ELIMINATE"
+    ELECT = "+ELECT"
+    COUNT = ".COUNT"
+    RANDOM = "*RANDOM"
+    THRESHOLD = "^THRESHOLD"
     
 logging.basicConfig(format=LOGGER_FORMAT)
 logging.getLogger(SVT_LOGGER).setLevel(logging.INFO)
@@ -76,7 +77,14 @@ class Ballot:
     def get_value(self):
         return self._value
 
-def randomly_select_first(sequence, key, action):
+def random_generator(num):
+    if not random_sequence:
+        print "Need random from " + num
+        sys.exit()
+    else:
+        return random_sequence.pop(0)
+    
+def randomly_select_first(sequence, key, action, random_generator=None):
     """Selects the first item of equals in a sorted sequence of items.
 
     For the given sorted sequence, returns the first item if it
@@ -85,9 +93,11 @@ def randomly_select_first(sequence, key, action):
     The value of each item in the sequence is provided by applying the
     function key to the item. The action parameter indicates the context
     in which the random selection takes place (election or elimination).
+    random_generator, if given, is the function that produces the random
+    selection.
 
     """
-    
+
     first_value = key(sequence[0])
     collected = []
     for item in sequence:
@@ -96,9 +106,13 @@ def randomly_select_first(sequence, key, action):
         else:
             break
     index = 0
-    if (len(collected) > 1):
-        index = int(random()*(len(collected)))
-        selected = collected[random_index]
+    num_eligibles = len(collected)
+    if (num_eligibles > 1):
+        if random_generator is None:
+            index = int(random() * num_eligibles)
+        else:
+            index = random_generator(num_eligibles)
+        selected = collected[index]
         logger = logging.getLogger(SVT_LOGGER)
         description = "{0} from {1} to {2}".format(selected, collected, action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
@@ -145,7 +159,7 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
             else:
                 i += 1
     for move, times in moves.iteritems():
-        description =  "{0} -> {1} {2}*{3}={4}".format(move[0], move[1], times,
+        description =  "{0} to {1} {2}*{3}={4}".format(move[0], move[1], times,
                                                        weight, times*weight)
         logger.info(LOG_MESSAGE.format(action=Action.TRANSFER,
                                        desc=description))
@@ -153,26 +167,26 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
                               if x not in transferred ]
     vote_count[selected] -= (len(transferred) * weight)
     
-def count_stv(ballots, seats):
+def count_stv(ballots, seats, rnd_gen=None):
     """Performs a SVT vote for the given ballots and number of seats.
+    
     """
     
-    allocated = {}
-    vote_count = {}
-    candidates = []
-    elected = []
-    hopefuls = []
+    allocated = {} # The allocation of ballots to candidates
+    vote_count = {} # A hash of ballot counts, indexed by candidates
+    candidates = [] # All candidates
+    elected = [] # The candidates that have been elected
+    hopefuls = [] # The candidates that may be elected
 
     seed()
 
-    current_round = 1
     threshold = int(len(ballots) / (seats + 1)) + 1
 
     logger = logging.getLogger(SVT_LOGGER)
+    logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD,
+                                   desc=threshold))
     
-    # First round
-    logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
-                                   desc=current_round))
+    # Do initial count
     for ballot in ballots:
         selected = ballot.candidates[0]
         for candidate in ballot.candidates:
@@ -187,87 +201,62 @@ def count_stv(ballots, seats):
         else:
             vote_count[selected] = 1
 
+    # In the beginning, all candidates are hopefuls
     hopefuls = [x for x in candidates]
 
-    # Log initial count
-    description  = ';'.join(map(lambda x: "{0} = {1}".format(x, vote_count[x]),
-                                candidates))
-    logger.info(LOG_MESSAGE.format(action=Action.COUNT,
-                                   desc=description))
-    for (candidate, ballots) in allocated.iteritems():
-        if len(ballots) >= threshold:
-            hopefuls.remove(candidate)
-            elected.append(candidate)
-            logger.info(LOG_MESSAGE.format(action=Action.ELECT,
-                                           desc=candidate))
-
-    # Subsequent rounds
-    # Check if the number of seats left is bigger than the number of
-    # hopefuls; if so, all hopefuls will be elected
-    elect_all = seats - len(elected) >= len(hopefuls)
-    while len(elected) < seats and not elect_all:
-        current_round += 1
+    # Start rounds
+    current_round = 1
+    num_elected = len(elected)
+    num_hopefuls = len(hopefuls)
+    while num_elected < seats and num_hopefuls > 0:
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
                                        desc=current_round))
-        # Filter candidates with surplus votes. These do not contain
-        # candidates whose votes have been transferred in previous
-        # rounds, since these candidates do not have surplus votes
-        # any more.
-        surplus_voted = filter(lambda x: vote_count[x] > threshold, vote_count)
-        surplus_sorted = sorted(surplus_voted, vote_count.get, reverse=True)
-        # If there is a surplus redistribute the best candidate's votes
-        # according to their next preferences
-        if len(surplus_voted) > 0:
-            best_candidate = randomly_select_first(surplus_sorted,
-                                                   key=vote_count.get,
-                                                   action=Action.ELECT)
-            surplus = vote_count[best_candidate] - threshold
-            # Calculate the weight for this round
-            weight = float(surplus) / vote_count[best_candidate]
-            # Find the next eligible preference for each one of the ballots
-            # cast for the candidate, and transfer the vote to that
-            # candidate with its value adjusted by the correct weight.
-            redistribute_ballots(best_candidate, hopefuls, allocated, weight,
-                                 vote_count)
-        # If there is no surplus, take the least hopeful candidate
-        # (i.e., the hopeful candidate with the less votes) and
-        # redistribute that candidate's votes.
-        else:
-            hopefuls_sorted = sorted(hopefuls, key=vote_count.get)
-            worst_candidate = randomly_select_first(hopefuls_sorted,
-                                                    key=vote_count.get,
-                                                    action=Action.ELIMINATE)
-            logger.info(LOG_MESSAGE.format(action=Action.ELIMINATE,
-                                           desc=worst_candidate))
-            redistribute_ballots(worst_candidate, hopefuls, allocated, 1.0,
-                                 vote_count)
-            hopefuls.remove(worst_candidate)
-        # Move from hopefuls to elected as necessary
-        transferred = []
-        for hopeful in hopefuls:
-            if vote_count[hopeful] >= threshold:
-                elected.append(hopeful)
-                transferred.append(hopeful)
-                logger.info(LOG_MESSAGE.format(action=Action.ELECT,
-                                               desc=hopeful))
-        hopefuls[:] = [x for x in hopefuls if x not in transferred ]
-
-        # At the end of each round, check if all hopefuls are to be elected.
-        elect_all = seats - len(elected) >= len(hopefuls)
-        if elect_all:
-            for hopeful in hopefuls:
-                elected.append(hopeful)
-                logger.info(LOG_MESSAGE.format(action=Action.ELECT,
-                                               desc=hopeful))
-            hopefuls = []
-
-        # Log count at the end of the round
+        # Log count 
         description  = ';'.join(map(lambda x: "{0} = {1}".format(x,
                                                                  vote_count[x]),
                                     candidates))
         logger.info(LOG_MESSAGE.format(action=Action.COUNT,
                                        desc=description))
-
+        hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
+        # If there is a surplus try to redistribute the best candidate's votes
+        # according to their next preferences
+        surplus = vote_count[hopefuls_sorted[0]] - threshold
+        remaining_seats = seats - num_elected
+        if surplus >= 0 or num_hopefuls <= remaining_seats:
+            best_candidate = randomly_select_first(hopefuls_sorted,
+                                                   key=vote_count.get,
+                                                   action=Action.ELECT,
+                                                   random_generator=rnd_gen)
+            hopefuls.remove(best_candidate)
+            elected.append(best_candidate)
+            logger.info(LOG_MESSAGE.format(action=Action.ELECT,
+                                           desc=best_candidate))
+            if surplus > 0:
+                # Calculate the weight for this round
+                weight = float(surplus) / vote_count[best_candidate]
+                # Find the next eligible preference for each one of the ballots
+                # cast for the candidate, and transfer the vote to that
+                # candidate with its value adjusted by the correct weight.
+                redistribute_ballots(best_candidate, hopefuls, allocated,
+                                     weight, vote_count)
+        # If there is no surplus, take the least hopeful candidate
+        # (i.e., the hopeful candidate with the less votes) and
+        # redistribute that candidate's votes.
+        else:
+            hopefuls_sorted.reverse()
+            worst_candidate = randomly_select_first(hopefuls_sorted,
+                                                    key=vote_count.get,
+                                                    action=Action.ELIMINATE,
+                                                    random_generator=rnd_gen)
+            hopefuls.remove(worst_candidate)
+            logger.info(LOG_MESSAGE.format(action=Action.ELIMINATE,
+                                           desc=worst_candidate))
+            redistribute_ballots(worst_candidate, hopefuls, allocated, 1.0,
+                                 vote_count)
+            
+        current_round += 1
+        num_hopefuls = len(hopefuls)
+        num_elected = len(elected)
 
     return elected, vote_count
 
@@ -276,8 +265,12 @@ if __name__ == "__main__":
     ballots = []
     for i in range(4):
         ballots.append(Ballot(("Orange",)))
+    for i in range(4):
+            ballots.append(Ballot(("Pomengranate",)))
     for i in range(2):
         ballots.append(Ballot(("Pear", "Orange")))
+    for i in range(2):
+        ballots.append(Ballot(("Pear", "Pomengranate")))
     for i in range(8):
         ballots.append(Ballot(("Chocolate", "Strawberry")))
     for i in range(4):
