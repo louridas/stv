@@ -95,13 +95,14 @@ def randomly_select_first(sequence, key, action):
             collected.append(item)
         else:
             break
-    random_index = int(random()*(len(collected)))
-    selected = collected[random_index]
+    index = 0
     if (len(collected) > 1):
+        index = int(random()*(len(collected)))
+        selected = collected[random_index]
         logger = logging.getLogger(SVT_LOGGER)
         description = "{0} from {1} to {2}".format(selected, collected, action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
-    return collected[random_index]
+    return collected[index]
         
     
 def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
