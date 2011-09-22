@@ -159,8 +159,10 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
             else:
                 i += 1
     for move, times in moves.iteritems():
-        description =  "{0} to {1} {2}*{3}={4}".format(move[0], move[1], times,
-                                                       weight, times*weight)
+        description =  "from {0} to {1} {2}*{3}={4}".format(move[0], move[1],
+                                                            times,
+                                                            weight,
+                                                            times*weight)
         logger.info(LOG_MESSAGE.format(action=Action.TRANSFER,
                                        desc=description))
     allocated[selected][:] = [x for x in allocated[selected]
@@ -274,11 +276,15 @@ if __name__ == "__main__":
     for i in range(8):
         ballots.append(Ballot(("Chocolate", "Strawberry")))
     for i in range(4):
+        ballots.append(Ballot(("Banana", "Sweets")))
+    for i in range(8):
+            ballots.append(Ballot(("Banana", "Strawberry")))
+    for i in range(4):
         ballots.append(Ballot(("Chocolate", "Sweets")))
     ballots.append(Ballot(("Strawberry",)))
     ballots.append(Ballot(("Sweets",)))
 
-    (elected, vote_count) = count_stv(ballots, 3)
+    (elected, vote_count) = count_stv(ballots, 5)
 
     print "Results:"
     for candidate in elected:
