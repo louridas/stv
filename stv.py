@@ -35,6 +35,8 @@ from random import random, seed
 import logging
 import sys
 import math
+import csv
+import argparse
 
 SVT_LOGGER = 'SVT'
 LOGGER_FORMAT = '%(levelname)s %(message)s'
@@ -195,14 +197,12 @@ def count_stv(ballots, seats, rnd_gen=None):
         for candidate in ballot.candidates:
             if candidate not in candidates:
                 candidates.append(candidate)
+                vote_count[candidate] = 0
         if selected in allocated:
             allocated[selected].append(ballot)
         else:
             allocated[selected] = [ballot]
-        if selected in vote_count:
-            vote_count[selected] += 1
-        else:
-            vote_count[selected] = 1
+        vote_count[selected] += 1
 
     # In the beginning, all candidates are hopefuls
     hopefuls = [x for x in candidates]
@@ -264,26 +264,19 @@ def count_stv(ballots, seats, rnd_gen=None):
     return elected, vote_count
 
 if __name__ == "__main__":
-    # Test data from http://en.wikipedia.org/wiki/Single_transferable_vote
+    parser = argparse.ArgumentParser(description='Perform STV')
+    parser.add_argument('--ballots', nargs='?', default='sys.stdin',
+                        dest='ballots_file', help='input ballots file')
+    args = parser.parse_args()
     ballots = []
-    for i in range(4):
-        ballots.append(Ballot(("Orange",)))
-    for i in range(4):
-            ballots.append(Ballot(("Pomengranate",)))
-    for i in range(2):
-        ballots.append(Ballot(("Pear", "Orange")))
-    for i in range(2):
-        ballots.append(Ballot(("Pear", "Pomengranate")))
-    for i in range(8):
-        ballots.append(Ballot(("Chocolate", "Strawberry")))
-    for i in range(4):
-        ballots.append(Ballot(("Banana", "Sweets")))
-    for i in range(8):
-            ballots.append(Ballot(("Banana", "Strawberry")))
-    for i in range(4):
-        ballots.append(Ballot(("Chocolate", "Sweets")))
-    ballots.append(Ballot(("Strawberry",)))
-    ballots.append(Ballot(("Sweets",)))
+    ballots_file = sys.stdin
+    if args.ballots_file != 'sys.stdin':
+        ballots_file = open(args.ballots_file)
+    ballots_reader = csv.reader(ballots_file, delimiter=',',
+                                quotechar='"',
+                                skipinitialspace = True)
+    for ballot in ballots_reader:
+        ballots.append(Ballot(ballot))
 
     (elected, vote_count) = count_stv(ballots, 5)
 
