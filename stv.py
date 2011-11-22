@@ -34,6 +34,7 @@ from operator import mul, itemgetter
 from random import random, seed
 import logging
 import sys
+import math
 
 SVT_LOGGER = 'SVT'
 LOGGER_FORMAT = '%(levelname)s %(message)s'
@@ -182,7 +183,7 @@ def count_stv(ballots, seats, rnd_gen=None):
 
     seed()
 
-    threshold = int(len(ballots) / (seats + 1)) + 1
+    threshold = int(math.ceil(1 + len(ballots) / (seats + 1)))
 
     logger = logging.getLogger(SVT_LOGGER)
     logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD,
