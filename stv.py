@@ -71,7 +71,7 @@ class Ballot:
     _value = 1.0
 
     def __init__(self, candidates=[]):
-        self.candidates = candidates
+        self.candidates = [ x.strip() for x in candidates]
 
     def add_weight(self, weight):
         self.weights.insert(0, weight)
