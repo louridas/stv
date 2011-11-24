@@ -136,7 +136,9 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
     logger = logging.getLogger(SVT_LOGGER)
     transferred = []
     # Keep a hash of ballot moves for logging purposes.
-    # The hash comprises 
+    # Keys are a tuple of the form (from_recipient, to_recipient, value)
+    # where value is the current value of the ballot. Each tuple points
+    # to the ballot being moved.
     moves = {}
 
     for ballot in allocated[selected]:
@@ -159,18 +161,19 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
                 vote_count[selected] -= current_value
                 reallocated = True
                 if (selected, recipient, current_value) in moves:
-                    moves[(selected, recipient, current_value)] += 1
+                    moves[(selected, recipient, current_value)].append(ballot)
                 else:
-                    moves[(selected, recipient, current_value)] = 1
+                    moves[(selected, recipient, current_value)] = [ballot]
                 transferred.append(ballot)
             else:
                 i += 1
-    for move, times in moves.iteritems():
+    for move, ballots in moves.iteritems():
+        times = len(ballots)
         description =  "from {0} to {1} {2}*{3}={4}".format(move[0],
                                                             move[1],
                                                             times,
                                                             move[2],
-                                                            times*move[2])
+                                                            times *move[2])
         logger.info(LOG_MESSAGE.format(action=Action.TRANSFER,
                                        desc=description))
     allocated[selected][:] = [x for x in allocated[selected]
