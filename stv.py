@@ -61,13 +61,13 @@ class Ballot:
     decreasing order of preference) and an ordered list of weights
     (new weights are added to the front of the list). The index of the
     current preference (for the first count and subsequent rounds)
-    is kept in an index.
+    is also kept.
 
     """
 
     candidates = []
     weights = [1.0]
-    index = 0
+    current_preference = 0
     _value = 1.0
 
     def __init__(self, candidates=[]):
@@ -135,42 +135,46 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
 
     logger = logging.getLogger(SVT_LOGGER)
     transferred = []
+    # Keep a hash of ballot moves for logging purposes.
+    # The hash comprises 
     moves = {}
 
     for ballot in allocated[selected]:
         reallocated = False
-        i = ballot.index + 1
+        i = ballot.current_preference + 1
         while not reallocated and i < len(ballot.candidates):
             recipient = ballot.candidates[i]
             if recipient in hopefuls:
-                ballot.index = i
+                ballot.current_preference = i
                 ballot.add_weight(weight)
+                current_value = ballot.get_value()
                 if recipient in allocated:
                     allocated[recipient].append(ballot)
                 else:
                     allocated[recipient] = [ballot]
                 if recipient in vote_count:
-                    vote_count[recipient] += (1 * weight)
+                    vote_count[recipient] += current_value
                 else:
-                    vote_count[recipient] = 1 * weight
+                    vote_count[recipient] = current_value
+                vote_count[selected] -= current_value
                 reallocated = True
-                if (selected, recipient) in moves:
-                    moves[(selected, recipient)] += 1
+                if (selected, recipient, current_value) in moves:
+                    moves[(selected, recipient, current_value)] += 1
                 else:
-                    moves[(selected, recipient)] = 1
+                    moves[(selected, recipient, current_value)] = 1
                 transferred.append(ballot)
             else:
                 i += 1
     for move, times in moves.iteritems():
-        description =  "from {0} to {1} {2}*{3}={4}".format(move[0], move[1],
+        description =  "from {0} to {1} {2}*{3}={4}".format(move[0],
+                                                            move[1],
                                                             times,
-                                                            weight,
-                                                            times*weight)
+                                                            move[2],
+                                                            times*move[2])
         logger.info(LOG_MESSAGE.format(action=Action.TRANSFER,
                                        desc=description))
     allocated[selected][:] = [x for x in allocated[selected]
                               if x not in transferred ]
-    vote_count[selected] -= (len(transferred) * weight)
     
 def count_stv(ballots, seats, rnd_gen=None):
     """Performs a SVT vote for the given ballots and number of seats.
@@ -185,7 +189,7 @@ def count_stv(ballots, seats, rnd_gen=None):
 
     seed()
 
-    threshold = int(math.ceil(1 + len(ballots) / (seats + 1)))
+    threshold = (1 + len(ballots) / (seats + 1))
 
     logger = logging.getLogger(SVT_LOGGER)
     logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD,
@@ -267,6 +271,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform STV')
     parser.add_argument('--ballots', nargs='?', default='sys.stdin',
                         dest='ballots_file', help='input ballots file')
+    parser.add_argument('--seats', nargs='?', default=0,
+                        dest='seats', help='number of seats')
     args = parser.parse_args()
     ballots = []
     ballots_file = sys.stdin
@@ -278,7 +284,9 @@ if __name__ == "__main__":
     for ballot in ballots_reader:
         ballots.append(Ballot(ballot))
 
-    (elected, vote_count) = count_stv(ballots, 5)
+    if args.seats == 0:
+        args.seats = len(ballots) / 2
+    (elected, vote_count) = count_stv(ballots, int(args.seats))
 
     print "Results:"
     for candidate in elected:
