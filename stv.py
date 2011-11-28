@@ -50,9 +50,6 @@ class Action:
     COUNT = ".COUNT"
     RANDOM = "*RANDOM"
     THRESHOLD = "^THRESHOLD"
-    
-logging.basicConfig(format=LOGGER_FORMAT)
-logging.getLogger(SVT_LOGGER).setLevel(logging.INFO)
 
 class Ballot:
     """A ballot class for Single Transferable Voting.
@@ -173,9 +170,9 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
                                                             move[1],
                                                             times,
                                                             move[2],
-                                                            times *move[2])
-        logger.info(LOG_MESSAGE.format(action=Action.TRANSFER,
-                                       desc=description))
+                                                            times * move[2])
+        logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER,
+                                        desc=description))
     allocated[selected][:] = [x for x in allocated[selected]
                               if x not in transferred ]
     
@@ -221,10 +218,10 @@ def count_stv(ballots, seats, rnd_gen=None):
     while num_elected < seats and num_hopefuls > 0:
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
                                        desc=current_round))
-        # Log count 
+        # Log count
         description  = ';'.join(map(lambda x: "{0} = {1}".format(x,
                                                                  vote_count[x]),
-                                    candidates))
+                                    hopefuls))
         logger.info(LOG_MESSAGE.format(action=Action.COUNT,
                                        desc=description))
         hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
@@ -238,9 +235,11 @@ def count_stv(ballots, seats, rnd_gen=None):
                                                    action=Action.ELECT,
                                                    random_generator=rnd_gen)
             hopefuls.remove(best_candidate)
-            elected.append(best_candidate)
+            elected.append((best_candidate, current_round,
+                            vote_count[best_candidate]))
             logger.info(LOG_MESSAGE.format(action=Action.ELECT,
-                                           desc=best_candidate))
+                                           desc=best_candidate
+                                           + " = " + str(vote_count[best_candidate])))
             if surplus > 0:
                 # Calculate the weight for this round
                 weight = float(surplus) / vote_count[best_candidate]
@@ -260,7 +259,8 @@ def count_stv(ballots, seats, rnd_gen=None):
                                                     random_generator=rnd_gen)
             hopefuls.remove(worst_candidate)
             logger.info(LOG_MESSAGE.format(action=Action.ELIMINATE,
-                                           desc=worst_candidate))
+                                           desc=worst_candidate
+                                           + " = " + str(vote_count[worst_candidate])))
             redistribute_ballots(worst_candidate, hopefuls, allocated, 1.0,
                                  vote_count)
             
@@ -276,7 +276,11 @@ if __name__ == "__main__":
                         dest='ballots_file', help='input ballots file')
     parser.add_argument('--seats', nargs='?', default=0,
                         dest='seats', help='number of seats')
+    parser.add_argument('--loglevel', nargs='?', default=logging.INFO,
+                        dest='loglevel', help='logging level')
     args = parser.parse_args()
+    logging.basicConfig(format=LOGGER_FORMAT)
+    logging.getLogger(SVT_LOGGER).setLevel(args.loglevel)
     ballots = []
     ballots_file = sys.stdin
     if args.ballots_file != 'sys.stdin':
@@ -292,5 +296,5 @@ if __name__ == "__main__":
     (elected, vote_count) = count_stv(ballots, int(args.seats))
 
     print "Results:"
-    for candidate in elected:
-        print candidate, vote_count[candidate]
+    for result in elected:
+        print result
