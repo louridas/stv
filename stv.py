@@ -68,7 +68,7 @@ class Ballot:
     _value = 1.0
 
     def __init__(self, candidates=[]):
-        self.candidates = [ x.strip() for x in candidates]
+        self.candidates = filter(None, candidates)
 
     def add_weight(self, weight):
         self.weights.insert(0, weight)
@@ -76,13 +76,6 @@ class Ballot:
 
     def get_value(self):
         return self._value
-
-def random_generator(num):
-    if not random_sequence:
-        print "Need random from " + num
-        sys.exit()
-    else:
-        return random_sequence.pop(0)
     
 def randomly_select_first(sequence, key, action, random_generator=None):
     """Selects the first item of equals in a sorted sequence of items.
@@ -106,17 +99,21 @@ def randomly_select_first(sequence, key, action, random_generator=None):
         else:
             break
     index = 0
+    selected = collected[index]
     num_eligibles = len(collected)
     if (num_eligibles > 1):
         if random_generator is None:
             index = int(random() * num_eligibles)
+            selected = collected[index]
         else:
-            index = random_generator(num_eligibles)
-        selected = collected[index]
+            if not random_generator:
+                print "Missing value for random selection"
+                sys.exit(1)
+            selected = random_generator.pop(0)
         logger = logging.getLogger(SVT_LOGGER)
         description = "{0} from {1} to {2}".format(selected, collected, action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
-    return collected[index]
+    return selected
         
     
 def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
@@ -176,7 +173,7 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
     allocated[selected][:] = [x for x in allocated[selected]
                               if x not in transferred ]
     
-def count_stv(ballots, seats, rnd_gen=None):
+def count_stv(ballots, droop, seats, rnd_gen=None):
     """Performs a SVT vote for the given ballots and number of seats.
     
     """
@@ -189,7 +186,10 @@ def count_stv(ballots, seats, rnd_gen=None):
 
     seed()
 
-    threshold = (1 + len(ballots) / (seats + 1))
+    if droop:
+            threshold = int(1 + (len(ballots) / (seats + 1.0)))
+    else:
+        threshold = int(math.ceil(1 + len(ballots) / (seats + 1.0)))
 
     logger = logging.getLogger(SVT_LOGGER)
     logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD,
@@ -272,11 +272,15 @@ def count_stv(ballots, seats, rnd_gen=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform STV')
-    parser.add_argument('--ballots', nargs='?', default='sys.stdin',
+    parser.add_argument('-b', '--ballots', default='sys.stdin',
                         dest='ballots_file', help='input ballots file')
-    parser.add_argument('--seats', nargs='?', default=0,
+    parser.add_argument('-n', '--not_droop', action="store_false",
+                        dest='droop', help="don't use droop quota")
+    parser.add_argument('-s', '--seats', type=int, default=0,
                         dest='seats', help='number of seats')
-    parser.add_argument('--loglevel', nargs='?', default=logging.INFO,
+    parser.add_argument('-r', '--random', nargs='*',
+                        dest='random', help='random selection results')
+    parser.add_argument('-l', '--loglevel', default=logging.INFO,
                         dest='loglevel', help='logging level')
     args = parser.parse_args()
     logging.basicConfig(format=LOGGER_FORMAT)
@@ -284,7 +288,7 @@ if __name__ == "__main__":
     ballots = []
     ballots_file = sys.stdin
     if args.ballots_file != 'sys.stdin':
-        ballots_file = open(args.ballots_file)
+        ballots_file = open(args.ballots_file, 'U')
     ballots_reader = csv.reader(ballots_file, delimiter=',',
                                 quotechar='"',
                                 skipinitialspace = True)
@@ -293,7 +297,8 @@ if __name__ == "__main__":
 
     if args.seats == 0:
         args.seats = len(ballots) / 2
-    (elected, vote_count) = count_stv(ballots, int(args.seats))
+    (elected, vote_count) = count_stv(ballots, args.droop, args.seats,
+                                      args.random)
 
     print "Results:"
     for result in elected:
