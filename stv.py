@@ -46,6 +46,7 @@ class Action:
     COUNT_ROUND = "@ROUND"
     TRANSFER = ">TRANSFER"
     ELIMINATE = "-ELIMINATE"
+    QUOTA ="!QUOTA"
     ELECT = "+ELECT"
     COUNT = ".COUNT"
     RANDOM = "*RANDOM"
@@ -68,7 +69,7 @@ class Ballot:
     _value = 1.0
 
     def __init__(self, candidates=[]):
-        self.candidates = filter(None, candidates)
+        self.candidates = candidates
 
     def add_weight(self, weight):
         self.weights.insert(0, weight)
@@ -107,7 +108,7 @@ def randomly_select_first(sequence, key, action, random_generator=None):
             selected = collected[index]
         else:
             if not random_generator:
-                print "Missing value for random selection"
+                print "Missing value for random selection among ", collected
                 sys.exit(1)
             selected = random_generator.pop(0)
         logger = logging.getLogger(SVT_LOGGER)
@@ -116,14 +117,14 @@ def randomly_select_first(sequence, key, action, random_generator=None):
     return selected
         
     
-def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
+def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
     """Redistributes the ballots from selected to the hopefuls.
 
     Redistributes the ballots currently allocated to the selected
     candidate. The ballots are redistributed with the given weight.
-    The total ballot allocation is given by the allocated dict. The current
-    vote count is given by vote_count and is adjusted according to the
-    redistribution.
+    The total ballot allocation is given by the allocated map, which
+    is modified accordingly. The current vote count is given by
+    vote_count and is adjusted according to the redistribution.
     
     """
 
@@ -172,10 +173,57 @@ def redistribute_ballots(selected, hopefuls, allocated, weight, vote_count):
                                         desc=description))
     allocated[selected][:] = [x for x in allocated[selected]
                               if x not in transferred ]
+
+def elect_reject(candidate, vote_count, constituencies, quota_limit,
+                 current_round, elected, rejected, constituencies_elected):
+    """Elects or rejects the candidate, based on quota restrictions.
+
+    If there are no quota limits, the candidate is elected. If there
+    are quota limits, the candidate is either elected or rejected, if
+    the quota limits are exceeded. The elected and rejected lists
+    are modified accordingly, as well as the constituencies_elected map.
+
+    Returns true if the candidate is elected, false otherwise.
+    """
     
-def count_stv(ballots, droop, seats, rnd_gen=None):
-    """Performs a SVT vote for the given ballots and number of seats.
     
+    logger = logging.getLogger(SVT_LOGGER)
+    quota_exceeded = False
+    # If there is a quota limit, check if it is exceeded
+    if quota_limit > 0 and candidate in constituencies:
+        current_constituency = constituencies[candidate]
+        if constituencies_elected[current_constituency] >= quota_limit:
+            quota_exceeded = True
+    # If the quota limit has been exceeded, reject the candidate
+    if quota_exceeded:
+        rejected.append((candidate, current_round, vote_count[candidate]))
+        d = candidate + " = " + str(vote_count[candidate])
+        msg = LOG_MESSAGE.format(action=Action.QUOTA, desc=d)
+        logger.info(msg)
+        return False
+    # Otherwise, elect the candidate
+    else:
+        elected.append((candidate, current_round, vote_count[candidate]))
+        if constituencies:
+            current_constituency = constituencies[candidate]
+            constituencies_elected[current_constituency] += 1
+        d = candidate + " = " + str(vote_count[candidate])
+        msg = LOG_MESSAGE.format(action=Action.ELECT, desc=d)
+        logger.info(msg)
+        return True
+
+def count_stv(ballots, seats, droop = True, constituencies = None,
+              quota_limit = 0, rnd_gen=None):
+    """Performs a STV vote for the given ballots and number of seats.
+
+    If droop is true the election threshold is calculated according to the
+    Droop quota:
+            threshold = int(1 + (len(ballots) / (seats + 1.0)))
+    otherwise it is calculated according to the following formula:
+            threshold = int(math.ceil(1 + len(ballots) / (seats + 1.0)))
+    The constituencies argument is a map of candidates to constituencies, if
+    any. The quota_limit, if different than zero, is the limit of candidates
+    that can be elected by a constituency.
     """
     
     allocated = {} # The allocation of ballots to candidates
@@ -183,11 +231,19 @@ def count_stv(ballots, droop, seats, rnd_gen=None):
     candidates = [] # All candidates
     elected = [] # The candidates that have been elected
     hopefuls = [] # The candidates that may be elected
+    # The candidates that have been eliminated because of low counts
+    eliminated = []
+    # The candidates that have been eliminated because of quota restrictions
+    rejected = []
+    # The number of candidates elected per constituency
+    constituencies_elected = {}
+    for constituency in constituencies.values():
+        constituencies_elected[constituency] = 0
 
     seed()
 
     if droop:
-            threshold = int(1 + (len(ballots) / (seats + 1.0)))
+        threshold = int(1 + (len(ballots) / (seats + 1.0)))
     else:
         threshold = int(math.ceil(1 + len(ballots) / (seats + 1.0)))
 
@@ -225,30 +281,38 @@ def count_stv(ballots, droop, seats, rnd_gen=None):
         logger.info(LOG_MESSAGE.format(action=Action.COUNT,
                                        desc=description))
         hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
-        # If there is a surplus try to redistribute the best candidate's votes
-        # according to their next preferences
+        # If there is a surplus record it so that we can try to
+        # redistribute the best candidate's votes according to their
+        # next preferences
         surplus = vote_count[hopefuls_sorted[0]] - threshold
-        remaining_seats = seats - num_elected
-        if surplus >= 0 or num_hopefuls <= remaining_seats:
+        # If there is either a candidate with surplus votes, or
+        # there are hopeful candidates beneath the threshold.
+        if surplus >= 0 or num_hopefuls <= (seats - num_elected):
             best_candidate = randomly_select_first(hopefuls_sorted,
                                                    key=vote_count.get,
                                                    action=Action.ELECT,
                                                    random_generator=rnd_gen)
+            if best_candidate not in hopefuls:
+                print "Not a valid candidate: ",best_candidate
+                sys.exit(1)
             hopefuls.remove(best_candidate)
-            elected.append((best_candidate, current_round,
-                            vote_count[best_candidate]))
-            logger.info(LOG_MESSAGE.format(action=Action.ELECT,
-                                           desc=best_candidate
-                                           + " = " + str(vote_count[best_candidate])))
+            was_elected = elect_reject(best_candidate, vote_count,
+                                       constituencies, quota_limit,
+                                       current_round, 
+                                       elected, rejected,
+                                       constituencies_elected)
+            if not was_elected:
+                redistribute_ballots(best_candidate, 1.0, hopefuls, allocated,
+                                     vote_count)
             if surplus > 0:
                 # Calculate the weight for this round
                 weight = float(surplus) / vote_count[best_candidate]
                 # Find the next eligible preference for each one of the ballots
                 # cast for the candidate, and transfer the vote to that
                 # candidate with its value adjusted by the correct weight.
-                redistribute_ballots(best_candidate, hopefuls, allocated,
-                                     weight, vote_count)
-        # If there is no surplus, take the least hopeful candidate
+                redistribute_ballots(best_candidate, weight, hopefuls,
+                                     allocated, vote_count)
+        # If nobody can get elected, take the least hopeful candidate
         # (i.e., the hopeful candidate with the less votes) and
         # redistribute that candidate's votes.
         else:
@@ -258,15 +322,25 @@ def count_stv(ballots, droop, seats, rnd_gen=None):
                                                     action=Action.ELIMINATE,
                                                     random_generator=rnd_gen)
             hopefuls.remove(worst_candidate)
-            logger.info(LOG_MESSAGE.format(action=Action.ELIMINATE,
-                                           desc=worst_candidate
-                                           + " = " + str(vote_count[worst_candidate])))
-            redistribute_ballots(worst_candidate, hopefuls, allocated, 1.0,
+            eliminated.append(worst_candidate)
+            d = worst_candidate + " = " + str(vote_count[worst_candidate])
+            msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=d)
+            logger.info(msg)
+            redistribute_ballots(worst_candidate, 1.0, hopefuls, allocated,
                                  vote_count)
             
         current_round += 1
         num_hopefuls = len(hopefuls)
         num_elected = len(elected)
+
+    # If there is either a candidate with surplus votes, or
+    # there are hopeful candidates beneath the threshold.
+    while (seats - num_elected) > 0 and len(eliminated) > 0:
+        best_candidate = eliminated.pop()
+        elect_reject(best_candidate, vote_count, constituencies,
+                     quota_limit, current_round,
+                     elected, rejected, constituencies_elected)
+        current_round += 1
 
     return elected, vote_count
 
@@ -278,6 +352,11 @@ if __name__ == "__main__":
                         dest='droop', help="don't use droop quota")
     parser.add_argument('-s', '--seats', type=int, default=0,
                         dest='seats', help='number of seats')
+    parser.add_argument('-c', '--constituencies',
+                        dest='constituencies_file',
+                        help='input constituencies file')
+    parser.add_argument('-q', '--quota', type=int, default=0,
+                        dest='quota', help='constituency quota')
     parser.add_argument('-r', '--random', nargs='*',
                         dest='random', help='random selection results')
     parser.add_argument('-l', '--loglevel', default=logging.INFO,
@@ -291,13 +370,29 @@ if __name__ == "__main__":
         ballots_file = open(args.ballots_file, 'U')
     ballots_reader = csv.reader(ballots_file, delimiter=',',
                                 quotechar='"',
-                                skipinitialspace = True)
+                                skipinitialspace=True)
     for ballot in ballots_reader:
         ballots.append(Ballot(ballot))
 
     if args.seats == 0:
         args.seats = len(ballots) / 2
-    (elected, vote_count) = count_stv(ballots, args.droop, args.seats,
+
+    constituencies = {}
+    if args.constituencies_file:
+        constituencies_file = open(args.constituencies_file, 'U')
+        constituencies_reader = csv.reader(constituencies_file,
+                                           delimiter=',',
+                                           quotechar='"',
+                                           skipinitialspace=True)
+        constituency_id = 0
+        for constituency in constituencies_reader:
+            for candidate in constituency:
+                constituencies[candidate] = constituency_id
+            constituency_id += 1
+        
+    (elected, vote_count) = count_stv(ballots, args.seats, args.droop,
+                                      constituencies,
+                                      args.quota,
                                       args.random)
 
     print "Results:"
