@@ -39,7 +39,7 @@ import csv
 import argparse
 
 SVT_LOGGER = 'SVT'
-LOGGER_FORMAT = '%(levelname)s %(message)s'
+LOGGER_FORMAT = '%(message)s'
 LOG_MESSAGE = "{action} {desc}"
 
 class Action:
@@ -362,7 +362,7 @@ if __name__ == "__main__":
     parser.add_argument('-l', '--loglevel', default=logging.INFO,
                         dest='loglevel', help='logging level')
     args = parser.parse_args()
-    logging.basicConfig(format=LOGGER_FORMAT)
+    logging.basicConfig(filename=sys.stdout.name, format=LOGGER_FORMAT)
     logging.getLogger(SVT_LOGGER).setLevel(args.loglevel)
     ballots = []
     ballots_file = sys.stdin
