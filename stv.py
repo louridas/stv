@@ -49,6 +49,7 @@ class Action:
     QUOTA ="!QUOTA"
     ELECT = "+ELECT"
     COUNT = ".COUNT"
+    ZOMBIES = "~ZOMBIES"
     RANDOM = "*RANDOM"
     THRESHOLD = "^THRESHOLD"
 
@@ -212,6 +213,17 @@ def elect_reject(candidate, vote_count, constituencies, quota_limit,
         logger.info(msg)
         return True
 
+def count_description(vote_count, candidates):
+    """Returns a string with count results.
+
+    The string is of the form of {0} = {1} separated by ; where each {0}
+    is a candidate and each {1} is the corresponding vote count.
+    """
+    
+    return  ';'.join(map(lambda x: "{0} = {1}".format(x, vote_count[x]),
+                         candidates))
+
+   
 def count_stv(ballots, seats, droop = True, constituencies = None,
               quota_limit = 0, rnd_gen=None):
     """Performs a STV vote for the given ballots and number of seats.
@@ -272,12 +284,12 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
     num_elected = len(elected)
     num_hopefuls = len(hopefuls)
     while num_elected < seats and num_hopefuls > 0:
+        # Log round
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
                                        desc=current_round))
         # Log count
-        description  = ';'.join(map(lambda x: "{0} = {1}".format(x,
-                                                                 vote_count[x]),
-                                    hopefuls))
+        description  = count_description(vote_count, hopefuls)
+       
         logger.info(LOG_MESSAGE.format(action=Action.COUNT,
                                        desc=description))
         hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
@@ -336,6 +348,13 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
     # If there is either a candidate with surplus votes, or
     # there are hopeful candidates beneath the threshold.
     while (seats - num_elected) > 0 and len(eliminated) > 0:
+        logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
+                                       desc=current_round))
+        description  = count_description(vote_count, eliminated)
+        
+        logger.info(LOG_MESSAGE.format(action=Action.ZOMBIES,
+                                       desc=description))
+
         best_candidate = eliminated.pop()
         elect_reject(best_candidate, vote_count, constituencies,
                      quota_limit, current_round,
