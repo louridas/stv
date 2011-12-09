@@ -362,8 +362,12 @@ if __name__ == "__main__":
     parser.add_argument('-l', '--loglevel', default=logging.INFO,
                         dest='loglevel', help='logging level')
     args = parser.parse_args()
-    logging.basicConfig(filename=sys.stdout.name, format=LOGGER_FORMAT)
-    logging.getLogger(SVT_LOGGER).setLevel(args.loglevel)
+
+    stream_handler = logging.StreamHandler(stream=sys.stdout)
+    logger = logging.getLogger(SVT_LOGGER)
+    logger.setLevel(args.loglevel)
+    logger.addHandler(stream_handler)
+
     ballots = []
     ballots_file = sys.stdin
     if args.ballots_file != 'sys.stdin':
