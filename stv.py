@@ -249,8 +249,13 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
     rejected = []
     # The number of candidates elected per constituency
     constituencies_elected = {}
-    for constituency in constituencies.values():
+    for (candidate, constituency) in constituencies.iteritems():
         constituencies_elected[constituency] = 0
+        if candidate not in allocated:
+            allocated[candidate] = []
+        if candidate not in candidates: # check not really needed
+            candidates.append(candidate)
+            vote_count[candidate] = 0
 
     seed()
 
