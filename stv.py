@@ -270,10 +270,9 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
             if candidate not in candidates:
                 candidates.append(candidate)
                 vote_count[candidate] = 0
-        if selected in allocated:
-            allocated[selected].append(ballot)
-        else:
-            allocated[selected] = [ballot]
+            if candidate not in allocated:
+                allocated[candidate] = []
+        allocated[selected].append(ballot)
         vote_count[selected] += 1
 
     # In the beginning, all candidates are hopefuls
