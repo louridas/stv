@@ -22,6 +22,7 @@ line, for instance:
     Banana, Sweets
     Banana, Strawberry
 
+***
     -n, --not_droop   
 
 Do not use the [Droop
@@ -31,9 +32,13 @@ slightly different formula is used, specifically:
 
     int(math.ceil(1 + len(ballots) / (seats + 1.0)))
 
+***
+
     -s SEATS --seats SEATS
 
 The number of seats to be elected.
+
+***
 
     -c CONSTITUENCIES_FILE, --constituencies CONSTITUENCIES_FILE
 
@@ -47,11 +52,15 @@ instance:
     Chocolate, Sweets
     Banana, Strawberry
 
+***
+
     -q QUOTA, --quota QUOTA
 
 The constituency quota, that is, the number of seats that can be
 filled by candidates in a single constituency, if constituencies are
 used.
+
+***
 
     -r [RANDOM [RANDOM ...]], --random [RANDOM [RANDOM ...]]
 
@@ -68,6 +77,8 @@ switch. If a second random selection is required, the program will
 again stop, and the user will re-run the program giving the indices of
 the manually selected candidates one after the other after the -r
 switch. And so on and so forth.
+
+***
 
     -l LOGLEVEL, --loglevel LOGLEVEL
 
