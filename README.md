@@ -12,7 +12,7 @@ Help is available with
 
 The parameters include:
 
-    -b BALLOTS_FILE, --ballots BALLOTS_FILE
+* `-b BALLOTS_FILE, --ballots BALLOTS_FILE`
 
 The ballots file is a CSV file containing a single ballot in each
 line, for instance:
@@ -22,8 +22,7 @@ line, for instance:
     Banana, Sweets
     Banana, Strawberry
 
-***
-    -n, --not_droop   
+* `-n, --not_droop`
 
 Do not use the [Droop
 quota](http://en.wikipedia.org/wiki/Droop_quota). Usually, the Droop
@@ -32,15 +31,11 @@ slightly different formula is used, specifically:
 
     int(math.ceil(1 + len(ballots) / (seats + 1.0)))
 
-***
-
-    -s SEATS --seats SEATS
+* `-s SEATS --seats SEATS`
 
 The number of seats to be elected.
 
-***
-
-    -c CONSTITUENCIES_FILE, --constituencies CONSTITUENCIES_FILE
+* `-c CONSTITUENCIES_FILE, --constituencies CONSTITUENCIES_FILE`
 
 In the Greek university governing councils elections there are quotas
 on the number of seats to be filled by members of a single school. The
@@ -52,17 +47,13 @@ instance:
     Chocolate, Sweets
     Banana, Strawberry
 
-***
-
-    -q QUOTA, --quota QUOTA
+* `-q QUOTA, --quota QUOTA`
 
 The constituency quota, that is, the number of seats that can be
 filled by candidates in a single constituency, if constituencies are
 used.
 
-***
-
-    -r [RANDOM [RANDOM ...]], --random [RANDOM [RANDOM ...]]
+* `-r [RANDOM [RANDOM ...]], --random [RANDOM [RANDOM ...]]`
 
 During the STV seat allocation process a random selection among
 candidates may be required, either to elect or to eliminate a
@@ -78,9 +69,7 @@ again stop, and the user will re-run the program giving the indices of
 the manually selected candidates one after the other after the -r
 switch. And so on and so forth.
 
-***
-
-    -l LOGLEVEL, --loglevel LOGLEVEL
+* `-l LOGLEVEL, --loglevel LOGLEVEL`
 
 The logging level, which can be either DEBUG or INFO (the default).
 
