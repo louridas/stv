@@ -1,7 +1,7 @@
 # STV Documentation
 
 This is a pure Python implementation of Simple Transferable Vote (STV)
-counting. It also implements the version of STV that is used in the
+counting. It also implements the version of STV used in the
 elections of the Greek university governing councils.
 
 # Usage
@@ -21,15 +21,6 @@ line, for instance:
     Banana, Sweets
     Banana, Sweets
     Banana, Strawberry
-
-* `-n, --not_droop`
-
-Do not use the [Droop
-quota](http://en.wikipedia.org/wiki/Droop_quota). Usually, the Droop
-quota is used. In the Greek university governing councils elections a
-slightly different formula is used, specifically:
-
-    int(math.ceil(1 + len(ballots) / (seats + 1.0)))
 
 * `-s SEATS --seats SEATS`
 

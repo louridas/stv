@@ -109,7 +109,7 @@ def randomly_select_first(sequence, key, action, random_generator=None):
             selected = collected[index]
         else:
             if not random_generator:
-                print "Missing value for random selection among ", collected
+                print("Missing value for random selection among ", collected)
                 sys.exit(1)
             selected = random_generator.pop(0)
         logger = logging.getLogger(SVT_LOGGER)
@@ -163,7 +163,7 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
                 transferred.append(ballot)
             else:
                 i += 1
-    for move, ballots in moves.iteritems():
+    for move, ballots in moves.items():
         times = len(ballots)
         description =  "from {0} to {1} {2}*{3}={4}".format(move[0],
                                                             move[1],
@@ -223,16 +223,10 @@ def count_description(vote_count, candidates):
     return  ';'.join(map(lambda x: "{0} = {1}".format(x, vote_count[x]),
                          candidates))
 
-   
-def count_stv(ballots, seats, droop = True, constituencies = None,
+def count_stv(ballots, seats, constituencies = None,
               quota_limit = 0, rnd_gen=None):
     """Performs a STV vote for the given ballots and number of seats.
 
-    If droop is true the election threshold is calculated according to the
-    Droop quota:
-            threshold = int(1 + (len(ballots) / (seats + 1.0)))
-    otherwise it is calculated according to the following formula:
-            threshold = int(math.ceil(1 + len(ballots) / (seats + 1.0)))
     The constituencies argument is a map of candidates to constituencies, if
     any. The quota_limit, if different than zero, is the limit of candidates
     that can be elected by a constituency.
@@ -249,7 +243,7 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
     rejected = []
     # The number of candidates elected per constituency
     constituencies_elected = {}
-    for (candidate, constituency) in constituencies.iteritems():
+    for (candidate, constituency) in constituencies.items():
         constituencies_elected[constituency] = 0
         if candidate not in allocated:
             allocated[candidate] = []
@@ -259,10 +253,7 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
 
     seed()
 
-    if droop:
-        threshold = int(1 + (len(ballots) / (seats + 1.0)))
-    else:
-        threshold = int(math.ceil(1 + len(ballots) / (seats + 1.0)))
+    threshold = int(len(ballots) / (seats + 1.0)) + 1
 
     logger = logging.getLogger(SVT_LOGGER)
     logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD,
@@ -286,7 +277,7 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
     # Start rounds
     current_round = 1
     num_elected = len(elected)
-    num_hopefuls = len(hopefuls)
+    num_hopefuls = len(hopefuls)    
     while num_elected < seats and num_hopefuls > 0:
         # Log round
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
@@ -309,7 +300,7 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
                                                    action=Action.ELECT,
                                                    random_generator=rnd_gen)
             if best_candidate not in hopefuls:
-                print "Not a valid candidate: ",best_candidate
+                print("Not a valid candidate: ",best_candidate)
                 sys.exit(1)
             hopefuls.remove(best_candidate)
             was_elected = elect_reject(best_candidate, vote_count,
@@ -360,10 +351,12 @@ def count_stv(ballots, seats, droop = True, constituencies = None,
                                        desc=description))
 
         best_candidate = eliminated.pop()
-        elect_reject(best_candidate, vote_count, constituencies,
-                     quota_limit, current_round,
-                     elected, rejected, constituencies_elected)
+        was_elected = elect_reject(best_candidate, vote_count, 
+                                   constituencies, quota_limit, 
+                                   current_round,
+                                   elected, rejected, constituencies_elected)
         current_round += 1
+        num_elected = len(elected)
 
     return elected, vote_count
 
@@ -371,8 +364,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform STV')
     parser.add_argument('-b', '--ballots', default='sys.stdin',
                         dest='ballots_file', help='input ballots file')
-    parser.add_argument('-n', '--not_droop', action="store_false",
-                        dest='droop', help="don't use droop quota")
     parser.add_argument('-s', '--seats', type=int, default=0,
                         dest='seats', help='number of seats')
     parser.add_argument('-c', '--constituencies',
@@ -394,7 +385,7 @@ if __name__ == "__main__":
     ballots = []
     ballots_file = sys.stdin
     if args.ballots_file != 'sys.stdin':
-        ballots_file = open(args.ballots_file, 'U')
+        ballots_file = open(args.ballots_file)
     ballots_reader = csv.reader(ballots_file, delimiter=',',
                                 quotechar='"',
                                 skipinitialspace=True)
@@ -417,11 +408,11 @@ if __name__ == "__main__":
                 constituencies[candidate] = constituency_id
             constituency_id += 1
         
-    (elected, vote_count) = count_stv(ballots, args.seats, args.droop,
+    (elected, vote_count) = count_stv(ballots, args.seats,
                                       constituencies,
                                       args.quota,
                                       args.random)
 
-    print "Results:"
+    print("Results:")
     for result in elected:
-        print result
+        print(result)
