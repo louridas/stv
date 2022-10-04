@@ -64,7 +64,6 @@ class Ballot:
     (new weights are added to the front of the list). The index of the
     current preference (for the first count and subsequent rounds)
     is also kept.
-
     """
 
     candidates = []
@@ -142,7 +141,6 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
     The total ballot allocation is given by the allocated map, which
     is modified accordingly. The current vote count is given by
     vote_count and is adjusted according to the redistribution.
-    
     """
 
     logger = logging.getLogger(SVT_LOGGER)
@@ -202,7 +200,6 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
     constituencies_elected map.
 
     Returns true if the candidate is elected, false otherwise.
-
     """
     
     
@@ -321,7 +318,6 @@ def count_stv(ballots, seats,
     candidates to constituencies, if any. The quota_limit, if
     different than zero, is the limit of candidates that can be
     elected by a constituency.
-
     """
 
     random.seed(a=seed)
