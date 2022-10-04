@@ -195,11 +195,11 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
                  current_round, elected, rejected, constituencies_elected):
     """Elects or rejects the candidate.
 
-    If the candidate does not reach the threshold, they are rejected.
-    Otherwise, if there are no quota limits, the candidate is elected. If there are quota limits, the
-    candidate is either elected or rejected, if the quota limits are
-    exceeded. The elected and rejected lists are modified accordingly,
-    as well as the constituencies_elected map.
+    Otherwise, if there are no quota limits, the candidate is elected.
+    If there are quota limits, the candidate is either elected or
+    rejected, if the quota limits are exceeded. The elected and
+    rejected lists are modified accordingly, as well as the
+    constituencies_elected map.
 
     Returns true if the candidate is elected, false otherwise.
 
@@ -246,6 +246,14 @@ def count_description(vote_count, candidates):
 def elect_round_robin(vote_count, constituencies, constituencies_map,
                       quota_limit, current_round, elected, rejected,
                       constituencies_elected, seats, num_elected):
+    """Elects candidates going round robin around the orphan constituencies.
+
+    If there are orphan constituencies, i.e., constituencies with no
+    elected candidates, try to elect them by going through each of
+    these constituencies, in decreasing order by side, with ties
+    broken randomly. In each constituency take each candidate in
+    decreasing orded by number of votes.
+    """
 
     logger = logging.getLogger(SVT_LOGGER)
     
