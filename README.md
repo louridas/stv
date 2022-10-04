@@ -24,7 +24,7 @@ line, for instance:
 
 * `-s SEATS --seats SEATS`
 
-The number of seats to be elected.
+The number of seats to be filled.
 
 * `-c CONSTITUENCIES_FILE, --constituencies CONSTITUENCIES_FILE`
 
@@ -32,11 +32,11 @@ In the Greek university governing councils elections there are quotas
 on the number of seats to be filled by members of a single school. The
 constituencies file is a CSV file containing the allocation of
 candidates among constituencies (i.e., schools). Each line contains
-the candidates that are elected in the same constituency, for
-instance:
+the name of the constituency, the size of the constituency, and the
+candidates that are elected in the constituency, for instance:
 
-    Chocolate, Sweets
-    Banana, Strawberry
+    Deserts, 10, Chocolate, Sweets
+    Fruits, 8, Banana, Strawberry
 
 * `-q QUOTA, --quota QUOTA`
 
@@ -44,21 +44,12 @@ The constituency quota, that is, the number of seats that can be
 filled by candidates in a single constituency, if constituencies are
 used.
 
-* `-r [RANDOM [RANDOM ...]], --random [RANDOM [RANDOM ...]]`
+* `-r RANDOM_SEED --random RANDOM_SEED`
 
+The random seed, in hexadecimal Python code format, e.g., `0x123EF`.
 During the STV seat allocation process a random selection among
 candidates may be required, either to elect or to eliminate a
-candidate. The random selection can be carried out automatically, or
-manually. If a manual random selection is necessary, then the user
-specifies the -r switch. During the execution of the program, when the
-random selection occurs, the program will stop and will output a
-message informing the user that there is a missing value for a random
-selection among candidates. The user will re-run the program giving
-the index of the manually randomly selected candidate after the -r
-switch. If a second random selection is required, the program will
-again stop, and the user will re-run the program giving the indices of
-the manually selected candidates one after the other after the -r
-switch. And so on and so forth.
+candidate, or to sort constituencies according to size breaking ties.
 
 * `-l LOGLEVEL, --loglevel LOGLEVEL`
 
@@ -119,3 +110,27 @@ for election.
 
 The candidate has been randomly selected from the list of candidates
 for elimination.
+
+    xSHUFFLE from [ items ] to [ shuffled items ]
+
+Perform a random shuffle in the given items. This is done prior to
+sorting the constituencies when performing round robin selection
+rounds. As sorting is stable, that means that ties are broken
+randomly. 
+
+    /SORT from [ items ] to [ sorted items ]
+    
+Sort the given items.
+    
+    oROUND_ROBIN [ constituencies ]
+    
+Try to elect candidates from orphan constituencies, that is,
+constituencies that have no candidate elected, taking the
+constituencies in round robin fashion, order by their size with ties
+broken randomly.
+    
+    #CONSTITUENCY_TURN constituency [ candidates with votes ]
+    
+The constituency currently selected in round robin fashion
+
+ 
