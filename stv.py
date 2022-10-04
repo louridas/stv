@@ -382,7 +382,7 @@ def count_stv(ballots, seats,
         surplus = vote_count[hopefuls_sorted[0]] - threshold
         # If there is a candidate that reaches the threshold,
         # try to elect them, respecting quota limits.
-        if surplus >= 0:# or num_hopefuls <= (seats - num_elected):
+        if surplus >= 0:
             best_candidate = select_first_rnd(hopefuls_sorted,
                                               key=vote_count.get,
                                               action=Action.ELECT)
