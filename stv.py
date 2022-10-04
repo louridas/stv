@@ -121,7 +121,7 @@ def sort_rnd(sequence, key, reverse):
     sequence_str = str(sequence)
     random.shuffle(sequence)
     shuffled_sequence_str = str(sequence)
-    description = ('from' + sequence_str +
+    description = ('from ' + sequence_str +
                    ' to ' + shuffled_sequence_str)
     logger.info(LOG_MESSAGE.format(action=Action.SHUFFLE,
                                    desc=description))
