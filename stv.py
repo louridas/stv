@@ -186,8 +186,8 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
                                                             times * move[2])
         logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER,
                                         desc=description))
-    allocated[selected][:] = [x for x in allocated[selected]
-                              if x not in transferred ]
+    allocated[selected][:] = [ x for x in allocated[selected]
+                               if x not in transferred ]
 
 def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
                  current_round, elected, rejected, constituencies_elected):
