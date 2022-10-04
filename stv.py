@@ -30,8 +30,7 @@
 # as representing official policies, either expressed or implied, of
 # GRNET S.A.
 
-from operator import itemgetter
-from random import random, seed
+import random
 import logging
 import sys
 import math
@@ -52,7 +51,11 @@ class Action:
     ZOMBIES = "~ZOMBIES"
     RANDOM = "*RANDOM"
     THRESHOLD = "^THRESHOLD"
-
+    ROUND_ROBIN = "oROUND_ROBIN"
+    CONSTITUENCY_TURN = "#CONSTITUENCY_TURN"
+    SHUFFLE = "xSHUFFLE"
+    SORT = "/SORT"
+   
 class Ballot:
     """A ballot class for Single Transferable Voting.
 
@@ -79,8 +82,8 @@ class Ballot:
     def get_value(self):
         return self._value
     
-def randomly_select_first(sequence, key, action, random_generator=None):
-    """Selects the first item of equals in a sorted sequence of items.
+def select_first_rnd(sequence, key, action):
+    """Selects the first item in a sorted sequence breaking ties randomly.
 
     For the given sorted sequence, returns the first item if it
     is different than the second; if there are ties so that there
@@ -88,36 +91,49 @@ def randomly_select_first(sequence, key, action, random_generator=None):
     The value of each item in the sequence is provided by applying the
     function key to the item. The action parameter indicates the context
     in which the random selection takes place (election or elimination).
-    random_generator, if given, is the function that produces the random
-    selection.
-
     """
 
     first_value = key(sequence[0])
-    collected = []
-    for item in sequence:
-        if key(item) == first_value:
-            collected.append(item)
-        else:
-            break
+    collected = [ item for item in sequence if key(item) == first_value ]
     index = 0
     selected = collected[index]
     num_eligibles = len(collected)
     if (num_eligibles > 1):
-        if random_generator is None:
-            index = int(random() * num_eligibles)
-            selected = collected[index]
-        else:
-            if not random_generator:
-                print("Missing value for random selection among ", collected)
-                sys.exit(1)
-            selected = random_generator.pop(0)
+        index = int(random.random() * num_eligibles)
+        selected = collected[index]
         logger = logging.getLogger(SVT_LOGGER)
-        description = "{0} from {1} to {2}".format(selected, collected, action)
+        description = f"{selected} from {collected} to {action}"
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
     return selected
         
+
+def sort_rnd(sequence, key, reverse):
+    """Sorts the sequence breaking ties randomnly.
+
+    The sequence is sorted in place and returned, using the key
+    callable as sorting key and reverse to determine whether the sort
+    will be ascending or descending. The function first shuffles the
+    sequence randomly, and the sorts the shuffled sequence. As the
+    sort is stable, the resulting sorted sequence has ties broken
+    randomly.
+    """
     
+    sequence_str = str(sequence)
+    random.shuffle(sequence)
+    shuffled_sequence_str = str(sequence)
+    description = ('from' + sequence_str +
+                   ' to ' + shuffled_sequence_str)
+    logger.info(LOG_MESSAGE.format(action=Action.SHUFFLE,
+                                   desc=description))
+    sorted_sequence = sorted(
+        sequence,
+        key=key,
+        reverse=reverse)
+    description = ('from' + shuffled_sequence_str +
+                   ' to ' + str(sorted_sequence))
+    logger.info(LOG_MESSAGE.format(action=Action.SORT, desc=description))
+    return sorted_sequence
+
 def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
     """Redistributes the ballots from selected to the hopefuls.
 
@@ -175,38 +191,42 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
     allocated[selected][:] = [x for x in allocated[selected]
                               if x not in transferred ]
 
-def elect_reject(candidate, vote_count, constituencies, quota_limit,
+def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
                  current_round, elected, rejected, constituencies_elected):
-    """Elects or rejects the candidate, based on quota restrictions.
+    """Elects or rejects the candidate.
 
-    If there are no quota limits, the candidate is elected. If there
-    are quota limits, the candidate is either elected or rejected, if
-    the quota limits are exceeded. The elected and rejected lists
-    are modified accordingly, as well as the constituencies_elected map.
+    If the candidate does not reach the threshold, they are rejected.
+    Otherwise, if there are no quota limits, the candidate is elected. If there are quota limits, the
+    candidate is either elected or rejected, if the quota limits are
+    exceeded. The elected and rejected lists are modified accordingly,
+    as well as the constituencies_elected map.
 
     Returns true if the candidate is elected, false otherwise.
+
     """
     
     
     logger = logging.getLogger(SVT_LOGGER)
     quota_exceeded = False
     # If there is a quota limit, check if it is exceeded
-    if quota_limit > 0 and candidate in constituencies:
-        current_constituency = constituencies[candidate]
+    if quota_limit > 0 and candidate in constituencies_map:
+        current_constituency = constituencies_map[candidate]
         if constituencies_elected[current_constituency] >= quota_limit:
             quota_exceeded = True
     # If the quota limit has been exceeded, reject the candidate
     if quota_exceeded:
         rejected.append((candidate, current_round, vote_count[candidate]))
-        d = candidate + " = " + str(vote_count[candidate])
+        d = (f'{candidate} {current_constituency} '
+             f'{constituencies_elected[current_constituency]} '
+             f'>= {quota_limit}')
         msg = LOG_MESSAGE.format(action=Action.QUOTA, desc=d)
         logger.info(msg)
         return False
     # Otherwise, elect the candidate
     else:
         elected.append((candidate, current_round, vote_count[candidate]))
-        if constituencies:
-            current_constituency = constituencies[candidate]
+        if constituencies_map:
+            current_constituency = constituencies_map[candidate]
             constituencies_elected[current_constituency] += 1
         d = candidate + " = " + str(vote_count[candidate])
         msg = LOG_MESSAGE.format(action=Action.ELECT, desc=d)
@@ -220,17 +240,84 @@ def count_description(vote_count, candidates):
     is a candidate and each {1} is the corresponding vote count.
     """
     
-    return  ';'.join(map(lambda x: "{0} = {1}".format(x, vote_count[x]),
-                         candidates))
+    return  ';'.join([ f"{c} = {vote_count[c]}" for c in candidates ])
 
-def count_stv(ballots, seats, constituencies = None,
-              quota_limit = 0, rnd_gen=None):
+
+def elect_round_robin(vote_count, constituencies, constituencies_map,
+                      quota_limit, current_round, elected, rejected,
+                      constituencies_elected, seats, num_elected):
+
+    logger = logging.getLogger(SVT_LOGGER)
+    
+    orphan_constituencies = [
+        (constituency, sz) for constituency, sz in constituencies.items()
+        if constituencies_elected[constituency] == 0
+    ]
+    
+    if len(orphan_constituencies) > 0:
+        sorted_orphan_constituencies = sort_rnd(orphan_constituencies,
+                                                key=lambda item: item[1],
+                                                reverse=True)
+        # Put the candidate votes for each sorted orphan constituency (soc)
+        # in a dictionary keyed by candidate with their votes as value.
+        soc_candidates = {} 
+        soc_candidates_num = 0
+        for soc, _ in sorted_orphan_constituencies:
+            # Get the vote count for the sorted orphan constituency.
+            soc_vote_count = [
+                (candidate, count) for candidate, count in vote_count.items()
+                if constituencies_map[candidate] == soc
+            ]
+            # Sort them by vote count, descending, so that we will be
+            # able to use select_first_rnd on them.
+            soc_vote_count.sort(key=lambda item:item[1], reverse=True)
+            soc_candidates[soc] = soc_vote_count
+            soc_candidates_num += len(soc_vote_count)
+        turn = 0
+        desc = ('[' +
+                ', '.join([ str(c) for c in sorted_orphan_constituencies ])
+                +']')
+        logger.info(LOG_MESSAGE.format(action=Action.ROUND_ROBIN,
+                                       desc=desc))
+        while (seats - num_elected) > 0 and soc_candidates_num > 0:
+            best_candidate = None
+            while best_candidate is None:
+                constituency_turn = sorted_orphan_constituencies[turn][0]
+                candidates_turn = soc_candidates[constituency_turn]
+                desc = f'{constituency_turn} {candidates_turn}'
+                logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
+                                               desc=desc))
+                if len(candidates_turn) > 0:
+                    best_candidate = select_first_rnd(candidates_turn,
+                                                      key=lambda item: item[0],
+                                                      action=Action.ELECT)[0]
+                    soc_candidates_num -= 1
+                turn = (turn + 1) % len(orphan_constituencies)
+            was_elected = elect_reject(best_candidate, vote_count, 
+                                       constituencies_map, quota_limit, 
+                                       current_round,
+                                       elected, rejected,
+                                       constituencies_elected)
+            num_elected = len(elected)
+    return num_elected
+
+def count_stv(ballots, seats,
+              constituencies,
+              constituencies_map,
+              quota_limit = 0,
+              seed=None):
     """Performs a STV vote for the given ballots and number of seats.
 
-    The constituencies argument is a map of candidates to constituencies, if
-    any. The quota_limit, if different than zero, is the limit of candidates
-    that can be elected by a constituency.
+    The constituencies argument is a map of constituencies to the
+    number of voters. The constituencies_map argument is a map of
+    candidates to constituencies, if any. The quota_limit, if
+    different than zero, is the limit of candidates that can be
+    elected by a constituency.
+
     """
+
+    random.seed(a=seed)
+    logger = logging.getLogger(SVT_LOGGER)
     
     allocated = {} # The allocation of ballots to candidates
     vote_count = {} # A hash of ballot counts, indexed by candidates
@@ -243,7 +330,7 @@ def count_stv(ballots, seats, constituencies = None,
     rejected = []
     # The number of candidates elected per constituency
     constituencies_elected = {}
-    for (candidate, constituency) in constituencies.items():
+    for (candidate, constituency) in constituencies_map.items():
         constituencies_elected[constituency] = 0
         if candidate not in allocated:
             allocated[candidate] = []
@@ -251,11 +338,8 @@ def count_stv(ballots, seats, constituencies = None,
             candidates.append(candidate)
             vote_count[candidate] = 0
 
-    seed()
-
     threshold = int(len(ballots) / (seats + 1.0)) + 1
 
-    logger = logging.getLogger(SVT_LOGGER)
     logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD,
                                    desc=threshold))
     
@@ -288,23 +372,19 @@ def count_stv(ballots, seats, constituencies = None,
         logger.info(LOG_MESSAGE.format(action=Action.COUNT,
                                        desc=description))
         hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
-        # If there is a surplus record it so that we can try to
+        # If there is a surplus record it, so that we can try to
         # redistribute the best candidate's votes according to their
-        # next preferences
+        # next preferences.
         surplus = vote_count[hopefuls_sorted[0]] - threshold
-        # If there is either a candidate with surplus votes, or
-        # there are hopeful candidates beneath the threshold.
-        if surplus >= 0 or num_hopefuls <= (seats - num_elected):
-            best_candidate = randomly_select_first(hopefuls_sorted,
-                                                   key=vote_count.get,
-                                                   action=Action.ELECT,
-                                                   random_generator=rnd_gen)
-            if best_candidate not in hopefuls:
-                print("Not a valid candidate: ",best_candidate)
-                sys.exit(1)
+        # If there is a candidate that reaches the threshold,
+        # try to elect them, respecting quota limits.
+        if surplus >= 0:# or num_hopefuls <= (seats - num_elected):
+            best_candidate = select_first_rnd(hopefuls_sorted,
+                                              key=vote_count.get,
+                                              action=Action.ELECT)
             hopefuls.remove(best_candidate)
             was_elected = elect_reject(best_candidate, vote_count,
-                                       constituencies, quota_limit,
+                                       constituencies_map, quota_limit,
                                        current_round, 
                                        elected, rejected,
                                        constituencies_elected)
@@ -320,18 +400,17 @@ def count_stv(ballots, seats, constituencies = None,
                 redistribute_ballots(best_candidate, weight, hopefuls,
                                      allocated, vote_count)
         # If nobody can get elected, take the least hopeful candidate
-        # (i.e., the hopeful candidate with the less votes) and
+        # (i.e., the hopeful candidate with the fewer votes) and
         # redistribute that candidate's votes.
         else:
             hopefuls_sorted.reverse()
-            worst_candidate = randomly_select_first(hopefuls_sorted,
-                                                    key=vote_count.get,
-                                                    action=Action.ELIMINATE,
-                                                    random_generator=rnd_gen)
+            worst_candidate = select_first_rnd(hopefuls_sorted,
+                                               key=vote_count.get,
+                                               action=Action.ELIMINATE)
             hopefuls.remove(worst_candidate)
             eliminated.append(worst_candidate)
-            d = worst_candidate + " = " + str(vote_count[worst_candidate])
-            msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=d)
+            desc = f'{worst_candidate} = {vote_count[worst_candidate]}'
+            msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=desc)
             logger.info(msg)
             redistribute_ballots(worst_candidate, 1.0, hopefuls, allocated,
                                  vote_count)
@@ -340,21 +419,34 @@ def count_stv(ballots, seats, constituencies = None,
         num_hopefuls = len(hopefuls)
         num_elected = len(elected)
 
+    # If there are still seats to be filled, they will be filled in a
+    # round-robin fashion by those constituencies that are not
+    # represented, in decreasing order of voters.
+    if (seats - num_elected) > 0:
+        num_elected = elect_round_robin(vote_count,
+                                        constituencies,
+                                        constituencies_map,
+                                        quota_limit, 
+                                        current_round,
+                                        elected, rejected,
+                                        constituencies_elected,
+                                        seats,
+                                        num_elected)
+ 
     # If there is either a candidate with surplus votes, or
     # there are hopeful candidates beneath the threshold.
     while (seats - num_elected) > 0 and len(eliminated) > 0:
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
                                        desc=current_round))
-        description  = count_description(vote_count, eliminated)
-        
+        description  = count_description(vote_count, eliminated)        
         logger.info(LOG_MESSAGE.format(action=Action.ZOMBIES,
                                        desc=description))
 
         best_candidate = eliminated.pop()
-        was_elected = elect_reject(best_candidate, vote_count, 
-                                   constituencies, quota_limit, 
-                                   current_round,
-                                   elected, rejected, constituencies_elected)
+        elect_reject(best_candidate, vote_count, 
+                     constituencies_map, quota_limit, 
+                     current_round,
+                     elected, rejected, constituencies_elected)
         current_round += 1
         num_elected = len(elected)
 
@@ -368,11 +460,12 @@ if __name__ == "__main__":
                         dest='seats', help='number of seats')
     parser.add_argument('-c', '--constituencies',
                         dest='constituencies_file',
-                        help='input constituencies file')
+                        help='input constituencies file')    
     parser.add_argument('-q', '--quota', type=int, default=0,
                         dest='quota', help='constituency quota')
-    parser.add_argument('-r', '--random', nargs='*',
-                        dest='random', help='random selection results')
+    parser.add_argument('-r', '--random', dest='random_seed',
+                        type=lambda x: int(x, 0),
+                        help='random seed')
     parser.add_argument('-l', '--loglevel', default=logging.INFO,
                         dest='loglevel', help='logging level')
     args = parser.parse_args()
@@ -395,23 +488,27 @@ if __name__ == "__main__":
     if args.seats == 0:
         args.seats = len(ballots) / 2
 
+    constituencies_map = {}
     constituencies = {}
     if args.constituencies_file:
-        constituencies_file = open(args.constituencies_file, 'U')
-        constituencies_reader = csv.reader(constituencies_file,
-                                           delimiter=',',
-                                           quotechar='"',
-                                           skipinitialspace=True)
-        constituency_id = 0
-        for constituency in constituencies_reader:
-            for candidate in constituency:
-                constituencies[candidate] = constituency_id
-            constituency_id += 1
-        
-    (elected, vote_count) = count_stv(ballots, args.seats,
+        with open(args.constituencies_file) as constituencies_file:
+             constituencies_reader = csv.reader(constituencies_file,
+                                                    delimiter=',',
+                                                    quotechar='"',
+                                                    skipinitialspace=True)
+             for constituency in constituencies_reader:
+                 constituency_name = constituency[0]
+                 constituency_size = int(constituency[1])
+                 constituencies[constituency_name] = constituency_size
+                 for candidate in constituency[2:]:
+                     constituencies_map[candidate] = constituency_name
+
+    (elected, vote_count) = count_stv(ballots,
+                                      args.seats,
                                       constituencies,
+                                      constituencies_map,
                                       args.quota,
-                                      args.random)
+                                      args.random_seed)
 
     print("Results:")
     for result in elected:
