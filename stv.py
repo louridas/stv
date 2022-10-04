@@ -301,11 +301,11 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                                                       action=Action.ELECT)[0]
                     soc_candidates_num -= 1
                 turn = (turn + 1) % len(orphan_constituencies)
-            was_elected = elect_reject(best_candidate, vote_count, 
-                                       constituencies_map, quota_limit, 
-                                       current_round,
-                                       elected, rejected,
-                                       constituencies_elected)
+            elect_reject(best_candidate, vote_count, 
+                         constituencies_map, quota_limit, 
+                         current_round,
+                         elected, rejected,
+                         constituencies_elected)
             num_elected = len(elected)
     return num_elected
 
