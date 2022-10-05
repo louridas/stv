@@ -62,7 +62,7 @@ For an invocation like:
 The output is a series of lines, each line prefixed with the action
 taking place. Specifically:
 
-    ^THRESHOLD
+    ^THRESHOLD threshold
 
 The election threshold.
 
@@ -122,13 +122,13 @@ randomly.
     
 Sort the given items.
     
-    oROUND_ROBIN [ constituencies ]
+    oROUND_ROBIN [ (constituency1, size1), (constituency2, size2), ... ]
     
 Try to elect candidates from orphan constituencies, that is,
 constituencies that have no candidate elected, taking the
 constituencies in round robin fashion, order by their size with ties
 broken randomly.
     
-    #CONSTITUENCY_TURN constituency [ candidates with votes ]
+    #CONSTITUENCY_TURN constituency [ (candidate1, vote1), (candidate2, vote2), ... ]
     
-The constituency currently selected in round robin fashion
+The constituency currently selected in round robin fashion.
