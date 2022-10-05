@@ -46,10 +46,11 @@ used.
 
 * `-r RANDOM_SEED --random RANDOM_SEED`
 
-The random seed, in hexadecimal Python code format, e.g., `0x123EF`.
-During the STV seat allocation process a random selection among
-candidates may be required, either to elect or to eliminate a
-candidate, or to sort constituencies according to size breaking ties.
+The random seed, as a Python code literal, so that the number can be
+in base 2, 8, 10, 16, e.g., `0x123EF`. During the STV seat allocation
+process a random selection among candidates may be required, either to
+elect or to eliminate a candidate, or to sort constituencies according
+to size breaking ties.
 
 * `-l LOGLEVEL, --loglevel LOGLEVEL`
 
