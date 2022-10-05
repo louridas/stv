@@ -397,7 +397,7 @@ def count_stv(ballots, seats,
                                      vote_count)
             elif surplus > 0:
                 # Calculate the weight for this round
-                weight = float(surplus) / vote_count[best_candidate]
+                weight = surplus / vote_count[best_candidate]
                 # Find the next eligible preference for each one of the ballots
                 # cast for the candidate, and transfer the vote to that
                 # candidate with its value adjusted by the correct weight.
