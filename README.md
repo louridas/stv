@@ -57,7 +57,7 @@ The logging level, which can be either DEBUG or INFO (the default).
 
 For an invocation like:
 
-    stv.py --ballots ballots.csv --constituencies constituencies.csv --seats 6 --quota 2 -n -l DEBUG
+    stv.py --ballots ballots.csv --constituencies constituencies.csv --seats 6 --quota 2 -l DEBUG
 
 The output is a series of line, prefixed with the action taking place.
 Specifically:
