@@ -66,33 +66,33 @@ taking place. Specifically:
 
 The election threshold.
 
-    @ROUND
+    @ROUND round
 
 The current counting round.
 
-    .COUNT
+    .COUNT candidate1 = count1; candidate2 = count2; ...
 
 The count at the current counting round, as a semicolon separated list
-of candidate = count pairs.
+of `candidate = count` pairs.
 
-    +ELECT candidate
+    +ELECT candidate candidate = votes
 
-The candidate has been elected.
+The `candidate` has been elected with `votes`.
 
-    >TRANSFER from candidate1 to candidate2 n*w
+    >TRANSFER from candidate1 to candidate2 n*w = t
 
-A transfer of n votes from candidate1 to candidate2 using weight w.
+A transfer of `n` votes from `candidate1` to `candidate2` using weight `w`.
 
-    -ELIMINATE 
+    -ELIMINATE candidate = votes
 
-The candidate has been eliminated because no candidate could be
-elected at this round, and this candidate has the smallest number of
-votes.
+The `candidate` having received `votes` has been eliminated because no
+candidate could be elected at this round, and this candidate has the
+smallest number of votes.
 
-    !QUOTA candidate
+    !QUOTA candidate constituency >= quota
 
-The candidate has been removed from the counting process because the
-quota has been reached.
+The `candidate` has been removed from the counting process because the
+`quota` has been reached for the respective `constituency`.
 
     ~ZOMBIES candidates
 
@@ -103,12 +103,12 @@ restrictions.
 
     *RANDOM candidate from [candidates] to +ELECT
 
-The candidate has been randomly selected from the list of candidates
+The `candidate` has been randomly selected from the list of candidates
 for election.
 
     *RANDOM candidate from [candidates] to -ELIMINATE
 
-The candidate has been randomly selected from the list of candidates
+The `candidate` has been randomly selected from the list of candidates
 for elimination.
 
     xSHUFFLE from [ items ] to [ shuffled items ]
@@ -132,5 +132,3 @@ broken randomly.
     #CONSTITUENCY_TURN constituency [ candidates with votes ]
     
 The constituency currently selected in round robin fashion
-
- 

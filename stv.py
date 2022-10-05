@@ -179,11 +179,11 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
                 i += 1
     for move, ballots in moves.items():
         times = len(ballots)
-        description =  "from {0} to {1} {2}*{3}={4}".format(move[0],
-                                                            move[1],
-                                                            times,
-                                                            move[2],
-                                                            times * move[2])
+        description =  "from {0} to {1} {2} * {3} = {4}".format(move[0],
+                                                                move[1],
+                                                                times,
+                                                                move[2],
+                                                                times * move[2])
         logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER,
                                         desc=description))
     allocated[selected][:] = [ x for x in allocated[selected]
