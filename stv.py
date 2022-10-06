@@ -233,11 +233,16 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
 def count_description(vote_count, candidates):
     """Returns a string with count results.
 
-    The string is of the form of {0} = {1} separated by ; where each {0}
-    is a candidate and each {1} is the corresponding vote count.
+    The string is of the form of {0} = {1} separated by ; where each
+    {0} is a candidate and each {1} is the corresponding vote count.
+    The count is in .
     """
-    
-    return  ';'.join([ f"{c} = {vote_count[c]}" for c in candidates ])
+
+    count_results = ((c, vote_count[c]) for c in candidates)
+    count_results = sorted(count_results,
+                           key=lambda item: (-item[1], item[0]))
+    return  ';'.join([ f"{candidate} = {votes}"
+                       for candidate, votes in count_results ])
 
 
 def elect_round_robin(vote_count, constituencies, constituencies_map,
