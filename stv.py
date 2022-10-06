@@ -30,34 +30,38 @@
 # as representing official policies, either expressed or implied, of
 # GRNET S.A.
 
+from __future__ import with_statement
+from __future__ import division
+from __future__ import absolute_import
 import random
 import logging
 import sys
 import math
 import csv
 import argparse
+from io import open
 
-SVT_LOGGER = 'SVT'
-LOGGER_FORMAT = '%(message)s'
-LOG_MESSAGE = "{action} {desc}"
+SVT_LOGGER = u'SVT'
+LOGGER_FORMAT = u'%(message)s'
+LOG_MESSAGE = u"{action} {desc}"
 
-class Action:
-    COUNT_ROUND = "@ROUND"
-    TRANSFER = ">TRANSFER"
-    ELIMINATE = "-ELIMINATE"
-    QUOTA ="!QUOTA"
-    ELECT = "+ELECT"
-    COUNT = ".COUNT"
-    ZOMBIES = "~ZOMBIES"
-    RANDOM = "*RANDOM"
-    THRESHOLD = "^THRESHOLD"
-    ROUND_ROBIN = "oROUND_ROBIN"
-    CONSTITUENCY_TURN = "#CONSTITUENCY_TURN"
-    SHUFFLE = "xSHUFFLE"
-    SORT = "/SORT"
+class Action(object):
+    COUNT_ROUND = u"@ROUND"
+    TRANSFER = u">TRANSFER"
+    ELIMINATE = u"-ELIMINATE"
+    QUOTA =u"!QUOTA"
+    ELECT = u"+ELECT"
+    COUNT = u".COUNT"
+    ZOMBIES = u"~ZOMBIES"
+    RANDOM = u"*RANDOM"
+    THRESHOLD = u"^THRESHOLD"
+    ROUND_ROBIN = u"oROUND_ROBIN"
+    CONSTITUENCY_TURN = u"#CONSTITUENCY_TURN"
+    SHUFFLE = u"xSHUFFLE"
+    SORT = u"/SORT"
    
-class Ballot:
-    """A ballot class for Single Transferable Voting.
+class Ballot(object):
+    u"""A ballot class for Single Transferable Voting.
 
     The ballot class contains an ordered list of candidates (in
     decreasing order of preference) and an ordered list of weights
@@ -82,7 +86,7 @@ class Ballot:
         return self._value
     
 def select_first_rnd(sequence, key, action):
-    """Selects the first item in a sorted sequence breaking ties randomly.
+    u"""Selects the first item in a sorted sequence breaking ties randomly.
 
     For the given sorted sequence, returns the first item if it
     is different than the second; if there are ties so that there
@@ -107,7 +111,7 @@ def select_first_rnd(sequence, key, action):
         
 
 def sort_rnd(sequence, key, reverse):
-    """Sorts the sequence breaking ties randomnly.
+    u"""Sorts the sequence breaking ties randomnly.
 
     The sequence is sorted in place and returned, using the key
     callable as sorting key and reverse to determine whether the sort
@@ -117,24 +121,24 @@ def sort_rnd(sequence, key, reverse):
     randomly.
     """
     
-    sequence_str = str(sequence)
+    sequence_str = unicode(sequence)
     random.shuffle(sequence)
-    shuffled_sequence_str = str(sequence)
-    description = ('from ' + sequence_str +
-                   ' to ' + shuffled_sequence_str)
+    shuffled_sequence_str = unicode(sequence)
+    description = (u'from ' + sequence_str +
+                   u' to ' + shuffled_sequence_str)
     logger.info(LOG_MESSAGE.format(action=Action.SHUFFLE,
                                    desc=description))
     sorted_sequence = sorted(
         sequence,
         key=key,
         reverse=reverse)
-    description = ('from' + shuffled_sequence_str +
-                   ' to ' + str(sorted_sequence))
+    description = (u'from' + shuffled_sequence_str +
+                   u' to ' + unicode(sorted_sequence))
     logger.info(LOG_MESSAGE.format(action=Action.SORT, desc=description))
     return sorted_sequence
 
 def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
-    """Redistributes the ballots from selected to the hopefuls.
+    u"""Redistributes the ballots from selected to the hopefuls.
 
     Redistributes the ballots currently allocated to the selected
     candidate. The ballots are redistributed with the given weight.
@@ -179,7 +183,7 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
                 i += 1
     for move, ballots in moves.items():
         times = len(ballots)
-        description =  "from {0} to {1} {2} * {3} = {4}".format(move[0],
+        description =  u"from {0} to {1} {2} * {3} = {4}".format(move[0],
                                                                 move[1],
                                                                 times,
                                                                 move[2],
@@ -191,7 +195,7 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
 
 def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
                  current_round, elected, rejected, constituencies_elected):
-    """Elects or rejects the candidate.
+    u"""Elects or rejects the candidate.
 
     Otherwise, if there are no quota limits, the candidate is elected.
     If there are quota limits, the candidate is either elected or
@@ -225,25 +229,25 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
         if constituencies_map:
             current_constituency = constituencies_map[candidate]
             constituencies_elected[current_constituency] += 1
-        d = candidate + " = " + str(vote_count[candidate])
+        d = candidate + u" = " + unicode(vote_count[candidate])
         msg = LOG_MESSAGE.format(action=Action.ELECT, desc=d)
         logger.info(msg)
         return True
 
 def count_description(vote_count, candidates):
-    """Returns a string with count results.
+    u"""Returns a string with count results.
 
     The string is of the form of {0} = {1} separated by ; where each {0}
     is a candidate and each {1} is the corresponding vote count.
     """
     
-    return  ';'.join([ f"{c} = {vote_count[c]}" for c in candidates ])
+    return  u';'.join([ f"{c} = {vote_count[c]}" for c in candidates ])
 
 
 def elect_round_robin(vote_count, constituencies, constituencies_map,
                       quota_limit, current_round, elected, rejected,
                       constituencies_elected, seats, num_elected):
-    """Elects candidates going round robin around the orphan constituencies.
+    u"""Elects candidates going round robin around the orphan constituencies.
 
     If there are orphan constituencies, i.e., constituencies with no
     elected candidates, try to elect them by going through each of
@@ -279,9 +283,9 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             soc_candidates[soc] = soc_vote_count
             soc_candidates_num += len(soc_vote_count)
         turn = 0
-        desc = ('[' +
-                ', '.join([ str(c) for c in sorted_orphan_constituencies ])
-                +']')
+        desc = (u'[' +
+                u', '.join([ unicode(c) for c in sorted_orphan_constituencies ])
+                +u']')
         logger.info(LOG_MESSAGE.format(action=Action.ROUND_ROBIN,
                                        desc=desc))
         while (seats - num_elected) > 0 and soc_candidates_num > 0:
@@ -311,7 +315,7 @@ def count_stv(ballots, seats,
               constituencies_map,
               quota_limit = 0,
               seed=None):
-    """Performs a STV vote for the given ballots and number of seats.
+    u"""Performs a STV vote for the given ballots and number of seats.
 
     The constituencies argument is a map of constituencies to the
     number of voters. The constituencies_map argument is a map of
@@ -456,22 +460,22 @@ def count_stv(ballots, seats,
 
     return elected, vote_count
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Perform STV')
-    parser.add_argument('-b', '--ballots', default='sys.stdin',
-                        dest='ballots_file', help='input ballots file')
-    parser.add_argument('-s', '--seats', type=int, default=0,
-                        dest='seats', help='number of seats')
-    parser.add_argument('-c', '--constituencies',
-                        dest='constituencies_file',
-                        help='input constituencies file')    
-    parser.add_argument('-q', '--quota', type=int, default=0,
-                        dest='quota', help='constituency quota')
-    parser.add_argument('-r', '--random', dest='random_seed',
+if __name__ == u"__main__":
+    parser = argparse.ArgumentParser(description=u'Perform STV')
+    parser.add_argument(u'-b', u'--ballots', default=u'sys.stdin',
+                        dest=u'ballots_file', help=u'input ballots file')
+    parser.add_argument(u'-s', u'--seats', type=int, default=0,
+                        dest=u'seats', help=u'number of seats')
+    parser.add_argument(u'-c', u'--constituencies',
+                        dest=u'constituencies_file',
+                        help=u'input constituencies file')    
+    parser.add_argument(u'-q', u'--quota', type=int, default=0,
+                        dest=u'quota', help=u'constituency quota')
+    parser.add_argument(u'-r', u'--random', dest=u'random_seed',
                         type=lambda x: int(x, 0),
-                        help='random seed')
-    parser.add_argument('-l', '--loglevel', default=logging.INFO,
-                        dest='loglevel', help='logging level')
+                        help=u'random seed')
+    parser.add_argument(u'-l', u'--loglevel', default=logging.INFO,
+                        dest=u'loglevel', help=u'logging level')
     args = parser.parse_args()
 
     stream_handler = logging.StreamHandler(stream=sys.stdout)
@@ -481,10 +485,10 @@ if __name__ == "__main__":
 
     ballots = []
     ballots_file = sys.stdin
-    if args.ballots_file != 'sys.stdin':
+    if args.ballots_file != u'sys.stdin':
         ballots_file = open(args.ballots_file)
-    ballots_reader = csv.reader(ballots_file, delimiter=',',
-                                quotechar='"',
+    ballots_reader = csv.reader(ballots_file, delimiter=u',',
+                                quotechar=u'"',
                                 skipinitialspace=True)
     for ballot in ballots_reader:
         ballots.append(Ballot(ballot))
@@ -497,8 +501,8 @@ if __name__ == "__main__":
     if args.constituencies_file:
         with open(args.constituencies_file) as constituencies_file:
              constituencies_reader = csv.reader(constituencies_file,
-                                                    delimiter=',',
-                                                    quotechar='"',
+                                                    delimiter=u',',
+                                                    quotechar=u'"',
                                                     skipinitialspace=True)
              for constituency in constituencies_reader:
                  constituency_name = constituency[0]
@@ -514,6 +518,6 @@ if __name__ == "__main__":
                                       args.quota,
                                       args.random_seed)
 
-    print("Results:")
+    print u"Results:"
     for result in elected:
-        print(result)
+        print result
