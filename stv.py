@@ -488,8 +488,8 @@ if __name__ == u"__main__":
     ballots_file = sys.stdin
     if args.ballots_file != u'sys.stdin':
         ballots_file = open(args.ballots_file)
-    ballots_reader = csv.reader(ballots_file, delimiter=u',',
-                                quotechar=u'"',
+    ballots_reader = csv.reader(ballots_file, delimiter=',',
+                                quotechar='"',
                                 skipinitialspace=True)
     for ballot in ballots_reader:
         ballots.append(Ballot(ballot))
