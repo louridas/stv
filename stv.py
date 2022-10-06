@@ -46,23 +46,23 @@ LOGGER_FORMAT = '%(message)s'
 LOG_MESSAGE = "{action} {desc}"
 
 class Action(object):
-    COUNT_ROUND = u"@ROUND"
-    TRANSFER = u">TRANSFER"
-    ELIMINATE = u"-ELIMINATE"
-    QUOTA =u"!QUOTA"
-    ELECT = u"+ELECT"
-    COUNT = u".COUNT"
-    ZOMBIES = u"~ZOMBIES"
-    RANDOM = u"*RANDOM"
-    THRESHOLD = u"^THRESHOLD"
-    ROUND_ROBIN = u"oROUND_ROBIN"
-    CONSTITUENCY_TURN = u"#CONSTITUENCY_TURN"
-    SHUFFLE = u"xSHUFFLE"
-    SORT = u"/SORT"
+    COUNT_ROUND = "@ROUND"
+    TRANSFER = ">TRANSFER"
+    ELIMINATE = "-ELIMINATE"
+    QUOTA = "!QUOTA"
+    ELECT = "+ELECT"
+    COUNT = ".COUNT"
+    ZOMBIES = "~ZOMBIES"
+    RANDOM = "*RANDOM"
+    THRESHOLD = "^THRESHOLD"
+    ROUND_ROBIN = "oROUND_ROBIN"
+    CONSTITUENCY_TURN = "#CONSTITUENCY_TURN"
+    SHUFFLE = "xSHUFFLE"
+    SORT = "/SORT"
 
 LOGGER = logging.getLogger(SVT_LOGGER)
 class Ballot(object):
-    u"""A ballot class for Single Transferable Voting.
+    """A ballot class for Single Transferable Voting.
 
     The ballot class contains an ordered list of candidates (in
     decreasing order of preference) and an ordered list of weights
@@ -87,7 +87,7 @@ class Ballot(object):
         return self._value
     
 def select_first_rnd(sequence, key, action, logger=LOGGER):
-    u"""Selects the first item in a sorted sequence breaking ties randomly.
+    """Selects the first item in a sorted sequence breaking ties randomly.
 
     For the given sorted sequence, returns the first item if it
     is different than the second; if there are ties so that there
@@ -105,13 +105,14 @@ def select_first_rnd(sequence, key, action, logger=LOGGER):
     if (num_eligibles > 1):
         index = int(random.random() * num_eligibles)
         selected = collected[index]
-        description = "{selected} from {collected} to {action}".format(selected=selected, collected=collected, action=action)
+        description = "{0} from {1} to {2}".format(
+            selected, collected, action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
     return selected
         
 
 def sort_rnd(sequence, key, reverse, logger=LOGGER):
-    u"""Sorts the sequence breaking ties randomnly.
+    """Sorts the sequence breaking ties randomnly.
 
     The sequence is sorted in place and returned, using the key
     callable as sorting key and reverse to determine whether the sort
@@ -137,8 +138,9 @@ def sort_rnd(sequence, key, reverse, logger=LOGGER):
     logger.info(LOG_MESSAGE.format(action=Action.SORT, desc=description))
     return sorted_sequence
 
-def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count, logger=LOGGER):
-    u"""Redistributes the ballots from selected to the hopefuls.
+def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count,
+                         logger=LOGGER):
+    """Redistributes the ballots from selected to the hopefuls.
 
     Redistributes the ballots currently allocated to the selected
     candidate. The ballots are redistributed with the given weight.
@@ -194,8 +196,9 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count, logg
                                if x not in transferred ]
 
 def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
-                 current_round, elected, rejected, constituencies_elected, logger=LOGGER):
-    u"""Elects or rejects the candidate.
+                 current_round, elected, rejected, constituencies_elected,
+                 logger=LOGGER):
+    """Elects or rejects the candidate.
 
     Otherwise, if there are no quota limits, the candidate is elected.
     If there are quota limits, the candidate is either elected or
@@ -236,20 +239,25 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
         return True
 
 def count_description(vote_count, candidates):
-    u"""Returns a string with count results.
+    """Returns a string with count results.
 
-    The string is of the form of {0} = {1} separated by ; where each {0}
-    is a candidate and each {1} is the corresponding vote count.
+    The string is of the form of {0} = {1} separated by ; where each
+    {0} is a candidate and each {1} is the corresponding vote count.
+    The count is in decreasing number of votes, with tied candidates
+    broken lexicographically.
     """
-    
-    return  ';'.join([ "{0} = {1}".format(c, vote_count[c])
-                       for c in candidates ])
 
+    count_results = ((c, vote_count[c]) for c in candidates)
+    count_results = sorted(count_results,
+                           key=lambda item: (-item[1], item[0]))
+    return  ';'.join([ "{0} = {1}".format(candidate, votes)
+                       for candidate, votes in count_results ])
 
 def elect_round_robin(vote_count, constituencies, constituencies_map,
                       quota_limit, current_round, elected, rejected,
-                      constituencies_elected, seats, num_elected, logger=LOGGER):
-    u"""Elects candidates going round robin around the orphan constituencies.
+                      constituencies_elected, seats, num_elected,
+                      logger=LOGGER):
+    """Elects candidates going round robin around the orphan constituencies.
 
     If there are orphan constituencies, i.e., constituencies with no
     elected candidates, try to elect them by going through each of
@@ -293,13 +301,14 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             while best_candidate is None:
                 constituency_turn = sorted_orphan_constituencies[turn][0]
                 candidates_turn = soc_candidates[constituency_turn]
-                desc = '{constituency_turn} {candidates_turn}'.format(constituency_turn=constituency_turn, candidates_turn=candidates_turn)
+                desc = '{0} {1}'.format(constituency_turn, candidates_turn)
                 logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
                                                desc=desc))
                 if len(candidates_turn) > 0:
                     best_candidate = select_first_rnd(candidates_turn,
                                                       key=lambda item: item[0],
-                                                      action=Action.ELECT, logger=logger)[0]
+                                                      action=Action.ELECT,
+                                                      logger=logger)[0]
                     soc_candidates_num -= 1
                 turn = (turn + 1) % len(orphan_constituencies)
             elect_reject(best_candidate, vote_count, 
@@ -316,7 +325,7 @@ def count_stv(ballots, seats,
               quota_limit = 0,
               seed=None,
               logger=None):
-    u"""Performs a STV vote for the given ballots and number of seats.
+    """Performs a STV vote for the given ballots and number of seats.
 
     The constituencies argument is a map of constituencies to the
     number of voters. The constituencies_map argument is a map of
@@ -415,10 +424,12 @@ def count_stv(ballots, seats,
             hopefuls_sorted.reverse()
             worst_candidate = select_first_rnd(hopefuls_sorted,
                                                key=vote_count.get,
-                                               action=Action.ELIMINATE, logger=logger)
+                                               action=Action.ELIMINATE,
+                                               logger=logger)
             hopefuls.remove(worst_candidate)
             eliminated.append(worst_candidate)
-            desc = '{worst_candidate} = {vote_count}'.format(worst_candidate=worst_candidate, vote_count=vote_count[worst_candidate])
+            desc = '{0} = {1}'.format(worst_candidate,
+                                      vote_count[worst_candidate])
             msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=desc)
             logger.info(msg)
             redistribute_ballots(worst_candidate, 1.0, hopefuls, allocated,
@@ -461,7 +472,7 @@ def count_stv(ballots, seats,
 
     return elected, vote_count
 
-if __name__ == u"__main__":
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform STV')
     parser.add_argument('-b', '--ballots', default='sys.stdin',
                         dest='ballots_file', help='input ballots file')
@@ -520,6 +531,6 @@ if __name__ == u"__main__":
                                       args.quota,
                                       args.random_seed)
 
-    print u"Results:"
+    print "Results:"
     for result in elected:
         print result
