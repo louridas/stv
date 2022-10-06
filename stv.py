@@ -105,7 +105,7 @@ def select_first_rnd(sequence, key, action):
         index = int(random.random() * num_eligibles)
         selected = collected[index]
         logger = logging.getLogger(SVT_LOGGER)
-        description = f"{selected} from {collected} to {action}"
+        description = "{selected} from {collected} to {action}".format(selected=selected, collected=collected, action=action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
     return selected
         
@@ -217,9 +217,9 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
     # If the quota limit has been exceeded, reject the candidate
     if quota_exceeded:
         rejected.append((candidate, current_round, vote_count[candidate]))
-        d = (f'{candidate} {current_constituency} '
-             f'{constituencies_elected[current_constituency]} '
-             f'>= {quota_limit}')
+        d = ('{candidate} {current_constituency} '.format(candidate=candidate, current_constituency=current_constituency) + \
+             '{constituencies_elected[current_constituency]} '.format(elected=constituencies_elected[current_constituency]) + \
+             '>= {quota_limit}').format(quota_limit=quota_limit)
         msg = LOG_MESSAGE.format(action=Action.QUOTA, desc=d)
         logger.info(msg)
         return False
@@ -241,7 +241,7 @@ def count_description(vote_count, candidates):
     is a candidate and each {1} is the corresponding vote count.
     """
     
-    return  u';'.join([ f"{c} = {vote_count[c]}" for c in candidates ])
+    return  u';'.join([ "{c} = {vote_count}".format(c=c, vote_count=vote_count[c]) for c in candidates ])
 
 
 def elect_round_robin(vote_count, constituencies, constituencies_map,
@@ -293,7 +293,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             while best_candidate is None:
                 constituency_turn = sorted_orphan_constituencies[turn][0]
                 candidates_turn = soc_candidates[constituency_turn]
-                desc = f'{constituency_turn} {candidates_turn}'
+                desc = '{constituency_turn} {candidates_turn}'.format(constituency_turn=constituency_turn, candidates_turn=candidates_turn)
                 logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
                                                desc=desc))
                 if len(candidates_turn) > 0:
@@ -417,7 +417,7 @@ def count_stv(ballots, seats,
                                                action=Action.ELIMINATE)
             hopefuls.remove(worst_candidate)
             eliminated.append(worst_candidate)
-            desc = f'{worst_candidate} = {vote_count[worst_candidate]}'
+            desc = '{worst_candidate} = {vote_count}'.format(worst_candidate=worst_candidate, vote_count=vote_count[worst_candidate])
             msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=desc)
             logger.info(msg)
             redistribute_ballots(worst_candidate, 1.0, hopefuls, allocated,
