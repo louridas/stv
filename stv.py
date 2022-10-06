@@ -235,7 +235,8 @@ def count_description(vote_count, candidates):
 
     The string is of the form of {0} = {1} separated by ; where each
     {0} is a candidate and each {1} is the corresponding vote count.
-    The count is in .
+    The count is in decreasing number of votes, with tied candidates
+    broken lexicographically.
     """
 
     count_results = ((c, vote_count[c]) for c in candidates)
