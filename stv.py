@@ -314,7 +314,8 @@ def count_stv(ballots, seats,
               constituencies,
               constituencies_map,
               quota_limit = 0,
-              seed=None):
+              seed=None,
+              logger=None):
     u"""Performs a STV vote for the given ballots and number of seats.
 
     The constituencies argument is a map of constituencies to the
@@ -325,7 +326,7 @@ def count_stv(ballots, seats,
     """
 
     random.seed(a=seed)
-    logger = logging.getLogger(SVT_LOGGER)
+    logger = logger or logging.getLogger(SVT_LOGGER)
     
     allocated = {} # The allocation of ballots to candidates
     vote_count = {} # A hash of ballot counts, indexed by candidates
