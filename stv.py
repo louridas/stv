@@ -299,10 +299,13 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                 logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
                                                desc=desc))
                 if len(candidates_turn) > 0:
-                    best_candidate = select_first_rnd(candidates_turn,
-                                                      key=lambda item: item[0],
-                                                      action=Action.ELECT)[0]
+                    best_candidate_vote = select_first_rnd(
+                        candidates_turn,
+                        key=lambda item: item[0],
+                        action=Action.ELECT)
+                    best_candidate = best_candidate_vote[0]
                     soc_candidates_num -= 1
+                    candidates_turn.remove(best_candidate_vote)
                 turn = (turn + 1) % len(orphan_constituencies)
             elect_reject(best_candidate, vote_count, 
                          constituencies_map, quota_limit, 
