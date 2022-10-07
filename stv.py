@@ -39,7 +39,6 @@ import sys
 import math
 import csv
 import argparse
-from io import open
 
 SVT_LOGGER = 'SVT'
 LOGGER_FORMAT = '%(message)s'
@@ -109,7 +108,14 @@ def select_first_rnd(sequence, key, action, logger=LOGGER):
             selected, collected, action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
     return selected
-        
+
+def stringify_sequence(sequence):
+    str_items = []
+    str_result =""
+    for s in sequence:
+        str_items.append('(' + ', '.join(str(sc) for sc in s) + ')')
+    str_result += ', '.join(str_items)
+    return str_result
 
 def sort_rnd(sequence, key, reverse, logger=LOGGER):
     """Sorts the sequence breaking ties randomnly.
@@ -121,20 +127,24 @@ def sort_rnd(sequence, key, reverse, logger=LOGGER):
     sort is stable, the resulting sorted sequence has ties broken
     randomly.
     """
-    
-    sequence_str = unicode(sequence)
+
+    description = 'from ['
+    description += stringify_sequence(sequence)
     random.shuffle(sequence)
-    shuffled_sequence_str = unicode(sequence)
-    description = ('from ' + sequence_str +
-                   ' to ' + shuffled_sequence_str)
+    description += '] to ['
+    shuffled_str = stringify_sequence(sequence)
+    description += shuffled_str
+    description += ']'
     logger.info(LOG_MESSAGE.format(action=Action.SHUFFLE,
                                    desc=description))
+    description = 'from [' + shuffled_str
+    description += '] to ['
     sorted_sequence = sorted(
         sequence,
         key=key,
         reverse=reverse)
-    description = ('from' + shuffled_sequence_str +
-                   ' to ' + unicode(sorted_sequence))
+    description += stringify_sequence(sequence)
+    description += ']'
     logger.info(LOG_MESSAGE.format(action=Action.SORT, desc=description))
     return sorted_sequence
 
@@ -292,7 +302,8 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             soc_candidates_num += len(soc_vote_count)
         turn = 0
         desc = ('[' +
-                ', '.join([ str(c) for c in sorted_orphan_constituencies ]) +
+                ', '.join([ "(" + c + ", " + str(v) + ")" 
+                           for c, v in sorted_orphan_constituencies ]) +
                 ']')
         logger.info(LOG_MESSAGE.format(action=Action.ROUND_ROBIN,
                                        desc=desc))
@@ -305,10 +316,12 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                 logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
                                                desc=desc))
                 if len(candidates_turn) > 0:
-                    best_candidate = select_first_rnd(candidates_turn,
-                                                      key=lambda item: item[0],
-                                                      action=Action.ELECT,
-                                                      logger=logger)[0]
+                    best_candidate_vote = select_first_rnd(
+                        candidates_turn,
+                        key=lambda item: item[0],
+                        action=Action.ELECT)
+                    best_candidate = best_candidate_vote[0]
+                    candidates_turn.remove(best_candidate_vote)
                     soc_candidates_num -= 1
                 turn = (turn + 1) % len(orphan_constituencies)
             elect_reject(best_candidate, vote_count, 
@@ -386,7 +399,6 @@ def count_stv(ballots, seats,
                                        desc=current_round))
         # Log count
         description  = count_description(vote_count, hopefuls)
-       
         logger.info(LOG_MESSAGE.format(action=Action.COUNT,
                                        desc=description))
         hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
@@ -521,7 +533,10 @@ if __name__ == "__main__":
                  constituency_name = constituency[0]
                  constituency_size = int(constituency[1])
                  constituencies[constituency_name] = constituency_size
-                 for candidate in constituency[2:]:
+                 candidates = [ 
+                               candidate.decode('utf-8') 
+                               for candidate in constituency[2:] ]
+                 for candidate in candidates:
                      constituencies_map[candidate] = constituency_name
 
     (elected, vote_count) = count_stv(ballots,
@@ -532,5 +547,5 @@ if __name__ == "__main__":
                                       args.random_seed)
 
     print "Results:"
-    for result in elected:
-        print result
+    for candidate, round, votes in elected:
+        print candidate, round, votes
