@@ -304,8 +304,8 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                         key=lambda item: item[0],
                         action=Action.ELECT)
                     best_candidate = best_candidate_vote[0]
-                    soc_candidates_num -= 1
                     candidates_turn.remove(best_candidate_vote)
+                    soc_candidates_num -= 1
                 turn = (turn + 1) % len(orphan_constituencies)
             elect_reject(best_candidate, vote_count, 
                          constituencies_map, quota_limit, 
