@@ -41,23 +41,23 @@ import csv
 import argparse
 
 SVT_LOGGER = 'SVT'
-LOGGER_FORMAT = '%(message)s'
-LOG_MESSAGE = "{action} {desc}"
+LOGGER_FORMAT = u'%(message)s'
+LOG_MESSAGE = u"{action} {desc}"
 
 class Action(object):
-    COUNT_ROUND = "@ROUND"
-    TRANSFER = ">TRANSFER"
-    ELIMINATE = "-ELIMINATE"
-    QUOTA = "!QUOTA"
-    ELECT = "+ELECT"
-    COUNT = ".COUNT"
-    ZOMBIES = "~ZOMBIES"
-    RANDOM = "*RANDOM"
-    THRESHOLD = "^THRESHOLD"
-    ROUND_ROBIN = "oROUND_ROBIN"
-    CONSTITUENCY_TURN = "#CONSTITUENCY_TURN"
-    SHUFFLE = "xSHUFFLE"
-    SORT = "/SORT"
+    COUNT_ROUND = u"@ROUND"
+    TRANSFER = u">TRANSFER"
+    ELIMINATE = u"-ELIMINATE"
+    QUOTA = u"!QUOTA"
+    ELECT = u"+ELECT"
+    COUNT = u".COUNT"
+    ZOMBIES = u"~ZOMBIES"
+    RANDOM = u"*RANDOM"
+    THRESHOLD = u"^THRESHOLD"
+    ROUND_ROBIN = u"oROUND_ROBIN"
+    CONSTITUENCY_TURN = u"#CONSTITUENCY_TURN"
+    SHUFFLE = u"xSHUFFLE"
+    SORT = u"/SORT"
 
 LOGGER = logging.getLogger(SVT_LOGGER)
 class Ballot(object):
@@ -113,8 +113,8 @@ def stringify_sequence(sequence):
     str_items = []
     str_result =""
     for s in sequence:
-        str_items.append('(' + ', '.join(str(sc) for sc in s) + ')')
-    str_result += ', '.join(str_items)
+        str_items.append(u'(' + ', '.join(unicode(sc) for sc in s) + ')')
+    str_result += u', '.join(str_items)
     return str_result
 
 def sort_rnd(sequence, key, reverse, logger=LOGGER):
@@ -229,7 +229,7 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
     # If the quota limit has been exceeded, reject the candidate
     if quota_exceeded:
         rejected.append((candidate, current_round, vote_count[candidate]))
-        d = ('{0} {1} {2} >= {3}').format(
+        d = (u'{0} {1} {2} >= {3}').format(
             candidate,
             current_constituency,
             constituencies_elected[current_constituency], 
@@ -312,7 +312,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             while best_candidate is None:
                 constituency_turn = sorted_orphan_constituencies[turn][0]
                 candidates_turn = soc_candidates[constituency_turn]
-                desc = '{0} {1}'.format(constituency_turn, candidates_turn)
+                desc = u'{0} {1}'.format(constituency_turn, candidates_turn)
                 logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
                                                desc=desc))
                 if len(candidates_turn) > 0:
