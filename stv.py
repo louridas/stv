@@ -292,7 +292,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             soc_candidates_num += len(soc_vote_count)
         turn = 0
         desc = ('[' +
-                ', '.join([ c for c in sorted_orphan_constituencies ]) +
+                ', '.join([ str(c) for c in sorted_orphan_constituencies ]) +
                 ']')
         logger.info(LOG_MESSAGE.format(action=Action.ROUND_ROBIN,
                                        desc=desc))
