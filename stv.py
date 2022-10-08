@@ -39,10 +39,25 @@ import sys
 import math
 import csv
 import argparse
+from codecs import open
 
 SVT_LOGGER = 'SVT'
 LOGGER_FORMAT = '%(message)s'
 LOG_MESSAGE = "{action} {desc}"
+
+# In order to handle UTF-8 in Python 2, the following two functions,
+# taken from https://docs.python.org/2/library/csv.html, are used.
+def unicode_csv_reader(unicode_csv_data, dialect=csv.excel, **kwargs):
+    # csv.py doesn't do Unicode; encode temporarily as UTF-8:
+    csv_reader = csv.reader(utf_8_encoder(unicode_csv_data),
+                            dialect=dialect, **kwargs)
+    for row in csv_reader:
+        # decode UTF-8 back to Unicode, cell by cell:
+        yield [unicode(cell, 'utf-8') for cell in row]
+
+def utf_8_encoder(unicode_csv_data):
+    for line in unicode_csv_data:
+        yield line.encode('utf-8')
 
 class Action(object):
     COUNT_ROUND = "@ROUND"
@@ -76,7 +91,7 @@ class Ballot(object):
     _value = 1.0
 
     def __init__(self, candidates=[]):
-        self.candidates = candidates
+        self.candidates = candidates #[ c.decode('utf-8') for c in candidates ]
 
     def add_weight(self, weight):
         self.weights.insert(0, weight)
@@ -105,17 +120,28 @@ def select_first_rnd(sequence, key, action, logger=LOGGER):
         index = int(random.random() * num_eligibles)
         selected = collected[index]
         description = "{0} from {1} to {2}".format(
-            selected, collected, action)
+            selected.encode('utf-8'), 
+            ','.join([c.encode('utf-8') for c in collected]), 
+            action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
     return selected
 
-def stringify_sequence(sequence):
+def stringify_tuples_sequence(sequence):
+    """
+    Returns a string out of a sequence of tuples.
+    """
+    
     str_items = []
-    str_result =""
-    for s in sequence:
-        str_items.append('(' + ', '.join(str(sc) for sc in s) + ')')
-    str_result += ', '.join(str_items)
-    return str_result
+    for tpl in sequence:
+        str_part = "("
+        for t in tpl:
+            if isinstance(t, unicode):
+                str_part += t.encode('utf-8')
+            else:
+                str_part += ", " + str(t)
+        str_part += ")"
+        str_items.append(str_part)
+    return ', '.join(str_items)
 
 def sort_rnd(sequence, key, reverse, logger=LOGGER):
     """Sorts the sequence breaking ties randomnly.
@@ -129,10 +155,10 @@ def sort_rnd(sequence, key, reverse, logger=LOGGER):
     """
 
     description = 'from ['
-    description += stringify_sequence(sequence)
+    description += stringify_tuples_sequence(sequence)
     random.shuffle(sequence)
     description += '] to ['
-    shuffled_str = stringify_sequence(sequence)
+    shuffled_str = stringify_tuples_sequence(sequence)
     description += shuffled_str
     description += ']'
     logger.info(LOG_MESSAGE.format(action=Action.SHUFFLE,
@@ -143,7 +169,7 @@ def sort_rnd(sequence, key, reverse, logger=LOGGER):
         sequence,
         key=key,
         reverse=reverse)
-    description += stringify_sequence(sequence)
+    description += stringify_tuples_sequence(sorted_sequence)
     description += ']'
     logger.info(LOG_MESSAGE.format(action=Action.SORT, desc=description))
     return sorted_sequence
@@ -194,9 +220,9 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count,
                 i += 1
     for move, ballots in moves.items():
         times = len(ballots)
-        description =  u"from {0} to {1} {2} * {3} = {4}".format(
-            move[0],
-            move[1],
+        description =  "from {0} to {1} {2} * {3} = {4}".format(
+            move[0].encode('utf-8'),
+            move[1].encode('utf-8'),
             times,
             move[2],
             times * move[2])
@@ -219,7 +245,6 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
     Returns true if the candidate is elected, false otherwise.
     """
     
-    
     quota_exceeded = False
     # If there is a quota limit, check if it is exceeded
     if quota_limit > 0 and candidate in constituencies_map:
@@ -230,8 +255,8 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
     if quota_exceeded:
         rejected.append((candidate, current_round, vote_count[candidate]))
         d = ('{0} {1} {2} >= {3}').format(
-            candidate,
-            current_constituency,
+            candidate.encode('utf-8'),
+            current_constituency.encode('utf-8'),
             constituencies_elected[current_constituency], 
             quota_limit)
         msg = LOG_MESSAGE.format(action=Action.QUOTA, desc=d)
@@ -243,7 +268,7 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
         if constituencies_map:
             current_constituency = constituencies_map[candidate]
             constituencies_elected[current_constituency] += 1
-        d = candidate + " = " + unicode(vote_count[candidate])
+        d = candidate.encode('utf-8') + " = " + str(vote_count[candidate])
         msg = LOG_MESSAGE.format(action=Action.ELECT, desc=d)
         logger.info(msg)
         return True
@@ -260,8 +285,10 @@ def count_description(vote_count, candidates):
     count_results = ((c, vote_count[c]) for c in candidates)
     count_results = sorted(count_results,
                            key=lambda item: (-item[1], item[0]))
-    return  ';'.join([ "{0} = {1}".format(candidate, votes)
-                       for candidate, votes in count_results ])
+    return  ';'.join([ 
+                      "{0} = {1}".format(candidate.encode('utf-8'), votes)
+                      for candidate, votes in count_results 
+                    ])
 
 def elect_round_robin(vote_count, constituencies, constituencies_map,
                       quota_limit, current_round, elected, rejected,
@@ -302,7 +329,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             soc_candidates_num += len(soc_vote_count)
         turn = 0
         desc = ('[' +
-                ', '.join([ "(" + c + ", " + str(v) + ")" 
+                ', '.join([ "(" + c.encode('utf-8') + ", " + str(v) + ")" 
                            for c, v in sorted_orphan_constituencies ]) +
                 ']')
         logger.info(LOG_MESSAGE.format(action=Action.ROUND_ROBIN,
@@ -312,7 +339,10 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             while best_candidate is None:
                 constituency_turn = sorted_orphan_constituencies[turn][0]
                 candidates_turn = soc_candidates[constituency_turn]
-                desc = '{0} {1}'.format(constituency_turn, candidates_turn)
+                desc = '{0} [{1}]'.format(
+                    constituency_turn.encode('utf-8'), 
+                    stringify_tuples_sequence(candidates_turn)
+                )
                 logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
                                                desc=desc))
                 if len(candidates_turn) > 0:
@@ -440,7 +470,7 @@ def count_stv(ballots, seats,
                                                logger=logger)
             hopefuls.remove(worst_candidate)
             eliminated.append(worst_candidate)
-            desc = '{0} = {1}'.format(worst_candidate,
+            desc = '{0} = {1}'.format(worst_candidate.encode('utf-8'),
                                       vote_count[worst_candidate])
             msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=desc)
             logger.info(msg)
@@ -510,13 +540,15 @@ if __name__ == "__main__":
     ballots = []
     ballots_file = sys.stdin
     if args.ballots_file != 'sys.stdin':
-        ballots_file = open(args.ballots_file)
-    ballots_reader = csv.reader(ballots_file,
-                                delimiter=',',
-                                quotechar='"',
-                                skipinitialspace=True)
+        ballots_file = open(args.ballots_file, encoding='utf-8')
+    ballots_reader = unicode_csv_reader(ballots_file,
+                                   delimiter=',',
+                                   quotechar='"',
+                                   skipinitialspace=True)
     for ballot in ballots_reader:
         ballots.append(Ballot(ballot))
+    if args.ballots_file != 'sys.stdin':
+        ballots_file.close()
 
     if args.seats == 0:
         args.seats = len(ballots) / 2
@@ -524,20 +556,20 @@ if __name__ == "__main__":
     constituencies_map = {}
     constituencies = {}
     if args.constituencies_file:
-        with open(args.constituencies_file) as constituencies_file:
-             constituencies_reader = csv.reader(constituencies_file,
-                                                delimiter=',',
-                                                quotechar='"',
-                                                skipinitialspace=True)
-             for constituency in constituencies_reader:
-                 constituency_name = constituency[0]
-                 constituency_size = int(constituency[1])
-                 constituencies[constituency_name] = constituency_size
-                 candidates = [ 
-                               candidate.decode('utf-8') 
-                               for candidate in constituency[2:] ]
-                 for candidate in candidates:
-                     constituencies_map[candidate] = constituency_name
+        with open(args.constituencies_file, 
+                encoding='utf-8') as constituencies_file:
+            constituencies_reader = unicode_csv_reader(
+                constituencies_file,
+                delimiter=',',
+                quotechar='"',
+                skipinitialspace=True)
+            for constituency in constituencies_reader:
+                constituency_name = constituency[0]
+                constituency_size = int(constituency[1])
+                constituencies[constituency_name] = constituency_size
+                candidates = constituency[2:] 
+                for candidate in candidates:
+                    constituencies_map[candidate] = constituency_name
 
     (elected, vote_count) = count_stv(ballots,
                                       args.seats,
@@ -548,4 +580,4 @@ if __name__ == "__main__":
 
     print "Results:"
     for candidate, round, votes in elected:
-        print candidate, round, votes
+        print "{0}, {1}, {2}".format(candidate.encode('utf-8'), round, votes)
