@@ -42,8 +42,8 @@ import argparse
 from codecs import open
 
 SVT_LOGGER = 'SVT'
-LOGGER_FORMAT = u'%(message)s'
-LOG_MESSAGE = u"{action} {desc}"
+LOGGER_FORMAT = '%(message)s'
+LOG_MESSAGE = '{action} {desc}'
 
 # In order to handle UTF-8 in Python 2, the following two functions,
 # taken from https://docs.python.org/2/library/csv.html, are used.
@@ -60,19 +60,19 @@ def utf_8_encoder(unicode_csv_data):
         yield line.encode('utf-8')
 
 class Action(object):
-    COUNT_ROUND = u"@ROUND"
-    TRANSFER = u">TRANSFER"
-    ELIMINATE = u"-ELIMINATE"
-    QUOTA = u"!QUOTA"
-    ELECT = u"+ELECT"
-    COUNT = u".COUNT"
-    ZOMBIES = u"~ZOMBIES"
-    RANDOM = u"*RANDOM"
-    THRESHOLD = u"^THRESHOLD"
-    ROUND_ROBIN = u"oROUND_ROBIN"
-    CONSTITUENCY_TURN = u"#CONSTITUENCY_TURN"
-    SHUFFLE = u"xSHUFFLE"
-    SORT = u"/SORT"
+    COUNT_ROUND = "@ROUND"
+    TRANSFER = ">TRANSFER"
+    ELIMINATE = "-ELIMINATE"
+    QUOTA = "!QUOTA"
+    ELECT = "+ELECT"
+    COUNT = ".COUNT"
+    ZOMBIES = "~ZOMBIES"
+    RANDOM = "*RANDOM"
+    THRESHOLD = "^THRESHOLD"
+    ROUND_ROBIN = "oROUND_ROBIN"
+    CONSTITUENCY_TURN = "#CONSTITUENCY_TURN"
+    SHUFFLE = "xSHUFFLE"
+    SORT = "/SORT"
 
 LOGGER = logging.getLogger(SVT_LOGGER)
 class Ballot(object):
@@ -91,7 +91,7 @@ class Ballot(object):
     _value = 1.0
 
     def __init__(self, candidates=[]):
-        self.candidates = candidates #[ c.decode('utf-8') for c in candidates ]
+        self.candidates = candidates
 
     def add_weight(self, weight):
         self.weights.insert(0, weight)
@@ -254,15 +254,9 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
     # If the quota limit has been exceeded, reject the candidate
     if quota_exceeded:
         rejected.append((candidate, current_round, vote_count[candidate]))
-<<<<<<< HEAD
         d = ('{0} {1} {2} >= {3}').format(
             candidate.encode('utf-8'),
             current_constituency.encode('utf-8'),
-=======
-        d = (u'{0} {1} {2} >= {3}').format(
-            candidate,
-            current_constituency,
->>>>>>> 553b17a144b2d11e08dc6af0cd75219b064a500c
             constituencies_elected[current_constituency], 
             quota_limit)
         msg = LOG_MESSAGE.format(action=Action.QUOTA, desc=d)
@@ -345,14 +339,10 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             while best_candidate is None:
                 constituency_turn = sorted_orphan_constituencies[turn][0]
                 candidates_turn = soc_candidates[constituency_turn]
-<<<<<<< HEAD
                 desc = '{0} [{1}]'.format(
                     constituency_turn.encode('utf-8'), 
                     stringify_tuples_sequence(candidates_turn)
                 )
-=======
-                desc = u'{0} {1}'.format(constituency_turn, candidates_turn)
->>>>>>> 553b17a144b2d11e08dc6af0cd75219b064a500c
                 logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
                                                desc=desc))
                 if len(candidates_turn) > 0:
