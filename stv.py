@@ -297,7 +297,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                 if len(candidates_turn) > 0:
                     best_candidate_vote = select_first_rnd(
                         candidates_turn,
-                        key=lambda item: item[0],
+                        key=lambda x: x[1],
                         action=Action.ELECT)
                     best_candidate = best_candidate_vote[0]
                     candidates_turn.remove(best_candidate_vote)
