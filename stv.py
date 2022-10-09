@@ -79,10 +79,9 @@ class Ballot(object):
     """A ballot class for Single Transferable Voting.
 
     The ballot class contains an ordered list of candidates (in
-    decreasing order of preference) and an ordered list of weights
-    (new weights are added to the front of the list). The index of the
-    current preference (for the first count and subsequent rounds)
-    is also kept.
+    decreasing order of preference). The index of the current
+    preference (for the first count and subsequent rounds) is also
+    kept.
     """
 
     candidates = []
@@ -204,7 +203,8 @@ def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
     if num_transfers == 0:
         return
     transfer_unit = transfer_volume / num_transfers
-    for (selected, target), ballots in transfers.items():
+    for (selected, target), ballots in sorted(transfers.items(),
+                                              key=lambda item : item[0]):
         times = len(ballots)
         transfer_value = transfer_unit * times
         if target in vote_count:
