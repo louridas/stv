@@ -60,26 +60,17 @@ class Ballot:
     """A ballot class for Single Transferable Voting.
 
     The ballot class contains an ordered list of candidates (in
-    decreasing order of preference) and an ordered list of weights
-    (new weights are added to the front of the list). The index of the
-    current preference (for the first count and subsequent rounds)
-    is also kept.
+    decreasing order of preference). The index of the current
+    holder of the ballot (for the first count and subsequent
+    rounds) is also kept.
+
     """
 
     candidates = []
-    weights = [1.0]
     current_holder = 0
-    _value = 1.0
 
     def __init__(self, candidates=[]):
         self.candidates = candidates
-
-    def add_weight(self, weight):
-        self.weights.append(weight)
-        self._value *= weight
-
-    def get_value(self):
-        return self._value
     
 def select_first_rnd(sequence, key, action):
     """Selects the first item in a sorted sequence breaking ties randomly.
@@ -138,19 +129,17 @@ def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
     """Redistributes the ballots from selected to the hopefuls.
 
     Redistributes the ballots currently allocated to the selected
-    candidate. The ballots are redistributed with the given weight.
-    The total ballot allocation is given by the allocated map, which
-    is modified accordingly. The current vote count is given by
-    vote_count and is adjusted according to the redistribution.
+    candidate among the hopeful candidates. The number of ballots to
+    be redistributed is given bu transfer_volume. The total ballot
+    allocation is given by the allocated map, which is modified
+    accordingly. The current vote count is given by vote_count and is
+    adjusted according to the redistribution.
+
     """
 
     logger = logging.getLogger(SVT_LOGGER)
+    transfers = {}
     transferred = []
-    # Keep a hash of ballot moves for logging purposes.
-    # Keys are a tuple of the form (from_recipient, to_recipient, value)
-    # where value is the current value of the ballot. Each tuple points
-    # to the ballot being moved.
-    moves = {}
     num_transfers = 0
     
     for ballot in allocated[selected]:
@@ -160,25 +149,23 @@ def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
             target = ballot.candidates[i]
             if target in hopefuls:
                 ballot.current_holder = i
-                #ballot.add_weight(weight)
-                current_value = ballot.get_value()
                 if target in allocated:
                     allocated[target].append(ballot)
                 else:
                     allocated[target] = [ballot]
-                reallocated = True
-                if (selected, target) in moves:
-                    moves[(selected, target)].append(ballot)
+                if (selected, target) in transfers:
+                    transfers[(selected, target)].append(ballot)
                 else:
-                    moves[(selected, target)] = [ballot]
+                    transfers[(selected, target)] = [ballot]
                 transferred.append(ballot)
                 num_transfers += 1
+                reallocated = True                
             else:
                 i += 1
     if num_transfers == 0:
         return
     transfer_unit = transfer_volume / num_transfers
-    for (selected, target), ballots in moves.items():
+    for (selected, target), ballots in transfers.items():
         times = len(ballots)
         transfer_value = transfer_unit * times
         if target in vote_count:
@@ -194,8 +181,10 @@ def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
             transfer_value)
         logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER,
                                         desc=description))
-    allocated[selected][:] = [ x for x in allocated[selected]
-                               if x not in transferred ]
+    allocated[selected][:] = [
+        x for x in allocated[selected]
+        if x not in transferred
+    ]
 
 def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
                  current_round, elected, rejected, constituencies_elected):
@@ -414,11 +403,9 @@ def count_stv(ballots, seats,
                 redistribute_ballots(best_candidate, received, hopefuls,
                                      allocated, vote_count)
             elif surplus > 0:
-                # Calculate the weight for this round
-                weight = surplus / vote_count[best_candidate]
                 # Find the next eligible preference for each one of the ballots
-                # cast for the candidate, and transfer the vote to that
-                # candidate with its value adjusted by the correct weight.
+                # cast for the candidate, and transfer the surplus votes
+                # to that candidate.
                 redistribute_ballots(best_candidate, surplus, hopefuls,
                                      allocated, vote_count)
         # If nobody can get elected, take the least hopeful candidate
