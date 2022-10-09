@@ -68,14 +68,14 @@ class Ballot:
 
     candidates = []
     weights = [1.0]
-    current_preference = 0
+    current_holder = 0
     _value = 1.0
 
     def __init__(self, candidates=[]):
         self.candidates = candidates
 
     def add_weight(self, weight):
-        self.weights.insert(0, weight)
+        self.weights.append(weight)
         self._value *= weight
 
     def get_value(self):
@@ -133,7 +133,8 @@ def sort_rnd(sequence, key, reverse):
     logger.info(LOG_MESSAGE.format(action=Action.SORT, desc=description))
     return sorted_sequence
 
-def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
+def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
+                         vote_count):
     """Redistributes the ballots from selected to the hopefuls.
 
     Redistributes the ballots currently allocated to the selected
@@ -150,40 +151,47 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
     # where value is the current value of the ballot. Each tuple points
     # to the ballot being moved.
     moves = {}
-
+    num_transfers = 0
+    
     for ballot in allocated[selected]:
         reallocated = False
-        i = ballot.current_preference + 1
+        i = ballot.current_holder + 1
         while not reallocated and i < len(ballot.candidates):
-            recipient = ballot.candidates[i]
-            if recipient in hopefuls:
-                ballot.current_preference = i
-                ballot.add_weight(weight)
+            target = ballot.candidates[i]
+            if target in hopefuls:
+                ballot.current_holder = i
+                #ballot.add_weight(weight)
                 current_value = ballot.get_value()
-                if recipient in allocated:
-                    allocated[recipient].append(ballot)
+                if target in allocated:
+                    allocated[target].append(ballot)
                 else:
-                    allocated[recipient] = [ballot]
-                if recipient in vote_count:
-                    vote_count[recipient] += current_value
-                else:
-                    vote_count[recipient] = current_value
-                vote_count[selected] -= current_value
+                    allocated[target] = [ballot]
                 reallocated = True
-                if (selected, recipient, current_value) in moves:
-                    moves[(selected, recipient, current_value)].append(ballot)
+                if (selected, target) in moves:
+                    moves[(selected, target)].append(ballot)
                 else:
-                    moves[(selected, recipient, current_value)] = [ballot]
+                    moves[(selected, target)] = [ballot]
                 transferred.append(ballot)
+                num_transfers += 1
             else:
                 i += 1
-    for move, ballots in moves.items():
+    if num_transfers == 0:
+        return
+    transfer_unit = transfer_volume / num_transfers
+    for (selected, target), ballots in moves.items():
         times = len(ballots)
-        description =  "from {0} to {1} {2} * {3} = {4}".format(move[0],
-                                                                move[1],
-                                                                times,
-                                                                move[2],
-                                                                times * move[2])
+        transfer_value = transfer_unit * times
+        if target in vote_count:
+            vote_count[target] += transfer_value
+        else:
+            vote_count[target] = transfer_value
+        vote_count[selected] -= transfer_value
+        description =  "from {0} to {1} {2} * {3} = {4}".format(
+            selected,
+            target,
+            times,
+            transfer_unit,
+            transfer_value)
         logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER,
                                         desc=description))
     allocated[selected][:] = [ x for x in allocated[selected]
@@ -388,7 +396,8 @@ def count_stv(ballots, seats,
         # If there is a surplus record it, so that we can try to
         # redistribute the best candidate's votes according to their
         # next preferences.
-        surplus = vote_count[hopefuls_sorted[0]] - threshold
+        received = vote_count[hopefuls_sorted[0]]
+        surplus = received - threshold
         # If there is a candidate that reaches the threshold,
         # try to elect them, respecting quota limits.
         if surplus >= 0:
@@ -401,16 +410,16 @@ def count_stv(ballots, seats,
                                        current_round, 
                                        elected, rejected,
                                        constituencies_elected)
-            if not was_elected:
-                redistribute_ballots(best_candidate, 1.0, hopefuls, allocated,
-                                     vote_count)
+            if not was_elected and received > 0:
+                redistribute_ballots(best_candidate, received, hopefuls,
+                                     allocated, vote_count)
             elif surplus > 0:
                 # Calculate the weight for this round
                 weight = surplus / vote_count[best_candidate]
                 # Find the next eligible preference for each one of the ballots
                 # cast for the candidate, and transfer the vote to that
                 # candidate with its value adjusted by the correct weight.
-                redistribute_ballots(best_candidate, weight, hopefuls,
+                redistribute_ballots(best_candidate, surplus, hopefuls,
                                      allocated, vote_count)
         # If nobody can get elected, take the least hopeful candidate
         # (i.e., the hopeful candidate with the fewer votes) and
@@ -425,8 +434,10 @@ def count_stv(ballots, seats,
             desc = f'{worst_candidate} = {vote_count[worst_candidate]}'
             msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=desc)
             logger.info(msg)
-            redistribute_ballots(worst_candidate, 1.0, hopefuls, allocated,
-                                 vote_count)
+            received = vote_count[worst_candidate]
+            if received > 0:
+                redistribute_ballots(worst_candidate, received, hopefuls,
+                                     allocated, vote_count)
             
         current_round += 1
         num_hopefuls = len(hopefuls)
@@ -526,3 +537,5 @@ if __name__ == "__main__":
     print("Results:")
     for result in elected:
         print(result)
+
+    print(vote_count)
