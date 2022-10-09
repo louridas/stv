@@ -109,9 +109,9 @@ def select_first_rnd(sequence, key, action, logger=LOGGER):
     if (num_eligibles > 1):
         index = int(random.random() * num_eligibles)
         selected = collected[index]
-        description = "{0} from {1} to {2}".format(
-            selected.encode('utf-8'), 
-            ','.join([c.encode('utf-8') for c in collected]), 
+        description = "{0} from [{1}] to {2}".format(
+            stringify_tuples_sequence((selected,)),
+            stringify_tuples_sequence(collected),
             action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
     return selected
@@ -343,7 +343,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                 if len(candidates_turn) > 0:
                     best_candidate_vote = select_first_rnd(
                         candidates_turn,
-                        key=lambda item: item[0],
+                        key=lambda item: item[1],
                         action=Action.ELECT)
                     best_candidate = best_candidate_vote[0]
                     candidates_turn.remove(best_candidate_vote)
