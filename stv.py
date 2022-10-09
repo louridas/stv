@@ -63,7 +63,6 @@ class Ballot:
     decreasing order of preference). The index of the current
     holder of the ballot (for the first count and subsequent
     rounds) is also kept.
-
     """
 
     candidates = []
