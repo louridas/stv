@@ -163,7 +163,8 @@ def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
     if num_transfers == 0:
         return
     transfer_unit = transfer_volume / num_transfers
-    for (selected, target), ballots in transfers.items():
+    for (selected, target), ballots in sorted(transfers.items(),
+                                              key=lambda item : item[0]):
         times = len(ballots)
         transfer_value = transfer_unit * times
         if target in vote_count:
