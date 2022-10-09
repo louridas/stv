@@ -45,7 +45,7 @@ class Action:
     COUNT_ROUND = "@ROUND"
     TRANSFER = ">TRANSFER"
     ELIMINATE = "-ELIMINATE"
-    QUOTA ="!QUOTA"
+    QUOTA = "!QUOTA"
     ELECT = "+ELECT"
     COUNT = ".COUNT"
     ZOMBIES = "~ZOMBIES"
@@ -133,7 +133,6 @@ def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
     allocation is given by the allocated map, which is modified
     accordingly. The current vote count is given by vote_count and is
     adjusted according to the redistribution.
-
     """
 
     logger = logging.getLogger(SVT_LOGGER)
@@ -328,16 +327,16 @@ def count_stv(ballots, seats,
     random.seed(a=seed)
     logger = logging.getLogger(SVT_LOGGER)
     
-    allocated = {} # The allocation of ballots to candidates
-    vote_count = {} # A hash of ballot counts, indexed by candidates
-    candidates = [] # All candidates
-    elected = [] # The candidates that have been elected
-    hopefuls = [] # The candidates that may be elected
-    # The candidates that have been eliminated because of low counts
+    allocated = {} # The allocation of ballots to candidates.
+    vote_count = {} # A hash of ballot counts, indexed by candidates.
+    candidates = [] # All candidates.
+    elected = [] # The candidates that have been elected.
+    hopefuls = [] # The candidates that may be elected.
+    # The candidates that have been eliminated because of low counts.
     eliminated = []
-    # The candidates that have been eliminated because of quota restrictions
+    # The candidates that have been eliminated because of quota restrictions.
     rejected = []
-    # The number of candidates elected per constituency
+    # The number of candidates elected per constituency.
     constituencies_elected = {}
     for (candidate, constituency) in constituencies_map.items():
         constituencies_elected[constituency] = 0
@@ -364,18 +363,18 @@ def count_stv(ballots, seats,
         allocated[selected].append(ballot)
         vote_count[selected] += 1
 
-    # In the beginning, all candidates are hopefuls
+    # In the beginning, all candidates are hopefuls.
     hopefuls = [x for x in candidates]
 
-    # Start rounds
+    # Start rounds.
     current_round = 1
     num_elected = len(elected)
     num_hopefuls = len(hopefuls)    
     while num_elected < seats and num_hopefuls > 0:
-        # Log round
+        # Log round.
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
                                        desc=current_round))
-        # Log count
+        # Log count.
         description  = count_description(vote_count, hopefuls)
        
         logger.info(LOG_MESSAGE.format(action=Action.COUNT,
@@ -523,5 +522,3 @@ if __name__ == "__main__":
     print("Results:")
     for result in elected:
         print(result)
-
-    print(vote_count)
