@@ -48,6 +48,7 @@ class Action:
     QUOTA = "!QUOTA"
     ELECT = "+ELECT"
     COUNT = ".COUNT"
+    SEED = "%SEED"
     ZOMBIES = "~ZOMBIES"
     RANDOM = "*RANDOM"
     THRESHOLD = "^THRESHOLD"
@@ -332,6 +333,8 @@ def count_stv(ballots, seats,
 
     random.seed(a=seed)
     logger = logging.getLogger(SVT_LOGGER)
+    logger.info(LOG_MESSAGE.format(action=Action.SEED,
+                                   desc=seed))
     
     allocated = {} # The allocation of ballots to candidates.
     vote_count = {} # A hash of ballot counts, indexed by candidates.
@@ -478,7 +481,7 @@ if __name__ == "__main__":
     parser.add_argument('-q', '--quota', type=int, default=0,
                         dest='quota', help='constituency quota')
     parser.add_argument('-r', '--random', dest='random_seed',
-                        type=lambda x: int(x, 0),
+                        type=str,
                         help='random seed')
     parser.add_argument('-l', '--loglevel', default=logging.INFO,
                         dest='loglevel', help='logging level')
