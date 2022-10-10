@@ -89,7 +89,24 @@ class Ballot(object):
 
     def __init__(self, candidates=[]):
         self.candidates = candidates
+
+def stringify_tuples_sequence(sequence):
+    """
+    Returns a string out of a sequence of tuples.
+    """
     
+    str_items = []
+    for tpl in sequence:
+        str_part = "("
+        for t in tpl:
+            if isinstance(t, unicode):
+                str_part += t.encode('utf-8')
+            else:
+                str_part += ", " + str(t)
+        str_part += ")"
+        str_items.append(str_part)
+    return ', '.join(str_items)
+        
 def select_first_rnd(sequence, key, action, logger=LOGGER):
     """Selects the first item in a sorted sequence breaking ties randomly.
 
@@ -109,29 +126,18 @@ def select_first_rnd(sequence, key, action, logger=LOGGER):
     if (num_eligibles > 1):
         index = int(random.random() * num_eligibles)
         selected = collected[index]
-        description = "{0} from [{1}] to {2}".format(
-            stringify_tuples_sequence((selected,)),
-            stringify_tuples_sequence(collected),
-            action)
+        if isinstance(selected, tuple):
+            description = "{0} from [{1}] to {2}".format(
+                stringify_tuples_sequence((selected,)),
+                stringify_tuples_sequence(collected),
+                action)
+        else:
+            description = "{0} from {1} to {2}".format(
+                selected.encode('utf-8'), 
+                ', '.join([c.encode('utf-8') for c in collected]), 
+                action)
         logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
     return selected
-
-def stringify_tuples_sequence(sequence):
-    """
-    Returns a string out of a sequence of tuples.
-    """
-    
-    str_items = []
-    for tpl in sequence:
-        str_part = "("
-        for t in tpl:
-            if isinstance(t, unicode):
-                str_part += t.encode('utf-8')
-            else:
-                str_part += ", " + str(t)
-        str_part += ")"
-        str_items.append(str_part)
-    return ', '.join(str_items)
 
 def sort_rnd(sequence, key, reverse, logger=LOGGER):
     """Sorts the sequence breaking ties randomnly.
