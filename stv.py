@@ -67,6 +67,7 @@ class Action(object):
     ELECT = "+ELECT"
     COUNT = ".COUNT"
     ZOMBIES = "~ZOMBIES"
+    SEED = "%SEED"
     RANDOM = "*RANDOM"
     THRESHOLD = "^THRESHOLD"
     ROUND_ROBIN = "oROUND_ROBIN"
@@ -389,7 +390,9 @@ def count_stv(ballots, seats,
 
     random.seed(a=seed)
     logger = logger or logging.getLogger(SVT_LOGGER)
-    
+    logger.info(LOG_MESSAGE.format(action=Action.SEED,
+                                   desc=seed))
+
     allocated = {} # The allocation of ballots to candidates.
     vote_count = {} # A hash of ballot counts, indexed by candidates.
     candidates = [] # All candidates.
@@ -537,7 +540,7 @@ if __name__ == "__main__":
     parser.add_argument('-q', '--quota', type=int, default=0,
                         dest='quota', help='constituency quota')
     parser.add_argument('-r', '--random', dest='random_seed',
-                        type=lambda x: int(x, 0),
+                        type=str,
                         help='random seed')
     parser.add_argument('-l', '--loglevel', default=logging.INFO,
                         dest='loglevel', help='logging level')
@@ -582,12 +585,16 @@ if __name__ == "__main__":
                 for candidate in candidates:
                     constituencies_map[candidate] = constituency_name
 
+    if args.random_seed:
+        seed = long(args.random_seed, 16)
+    else:
+        seed = None
     (elected, vote_count) = count_stv(ballots,
                                       args.seats,
                                       constituencies,
                                       constituencies_map,
                                       args.quota,
-                                      args.random_seed)
+                                      seed)
 
     print "Results:"
     for candidate, round, votes in elected:
