@@ -192,7 +192,6 @@ def redistribute_ballots(selected, weight, hopefuls, allocated,
     vote_count and is adjusted according to the redistribution.
     """
 
-    logger = logging.getLogger(SVT_LOGGER)
     transferred = []
     # Keep a hash of ballot moves for logging purposes.
     # Keys are a tuple of the form (from_recipient, to_recipient, value)
