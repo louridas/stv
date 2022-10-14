@@ -70,7 +70,7 @@ class Ballot:
     candidates = []
     weights = [1.0]
     current_holder = 0
-    _value = 1.0
+    _value = 1
 
     def __init__(self, candidates=[]):
         self.candidates = candidates
@@ -165,11 +165,6 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
                     allocated[recipient].append(ballot)
                 else:
                     allocated[recipient] = [ballot]
-                if recipient in vote_count:
-                    vote_count[recipient] += current_value
-                else:
-                    vote_count[recipient] = current_value
-                vote_count[selected] -= current_value
                 reallocated = True
                 if (selected, recipient, current_value) in moves:
                     moves[(selected, recipient, current_value)].append(ballot)
@@ -180,12 +175,18 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
                 i += 1
     for (selected, recipient, current_value), ballots in moves.items():
         times = len(ballots)
+        total_value = round(times * current_value, 15)
+        if recipient in vote_count:
+            vote_count[recipient] += total_value
+        else:
+            vote_count[recipient] = total_value
+        vote_count[selected] -= total_value
         description =  "from {0} to {1} {2} * {3} = {4}".format(
             selected,
             recipient,
             times,
             current_value,
-            times * current_value)
+            total_value)
         logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER.value,
                                         desc=description))
     allocated[selected][:] = [
@@ -409,10 +410,10 @@ def count_stv(ballots, seats,
                                        elected, rejected,
                                        constituencies_elected)
             if not was_elected:
-                redistribute_ballots(best_candidate, 1.0, hopefuls, allocated,
-                                     vote_count)
+                redistribute_ballots(best_candidate, 1.0,
+                                     hopefuls, allocated, vote_count)
             elif surplus > 0:
-                # Calculate the weight for this round
+                # Calculate the weight for this round.
                 weight = surplus / vote_count[best_candidate]
                 # Find the next eligible preference for each one of the ballots
                 # cast for the candidate, and transfer the vote to that
