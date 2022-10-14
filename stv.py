@@ -175,6 +175,8 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
                 i += 1
     for (selected, recipient, current_value), ballots in moves.items():
         times = len(ballots)
+        # Assuming we are using IEEE double precision, we should have
+        # 15 significant decimal digits.
         total_value = round(times * current_value, 15)
         if recipient in vote_count:
             vote_count[recipient] += total_value
