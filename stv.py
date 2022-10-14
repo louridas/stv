@@ -213,11 +213,6 @@ def redistribute_ballots(selected, weight, hopefuls, allocated,
                     allocated[recipient].append(ballot)
                 else:
                     allocated[recipient] = [ballot]
-                if recipient in vote_count:
-                    vote_count[recipient] += current_value
-                else:
-                    vote_count[recipient] = current_value
-                vote_count[selected] -= current_value
                 reallocated = True
                 if (selected, recipient, current_value) in moves:
                     moves[(selected, recipient, current_value)].append(ballot)
@@ -228,12 +223,20 @@ def redistribute_ballots(selected, weight, hopefuls, allocated,
                 i += 1
     for (selected, recipient, current_value), ballots in moves.items():
         times = len(ballots)
+        # Assuming we are using IEEE double precision, we should have
+        # 15 significant decimal digits.
+        total_value = round(times * current_value, 15)
+        if recipient in vote_count:
+            vote_count[recipient] += total_value
+        else:
+            vote_count[recipient] = total_value
+        vote_count[selected] -= total_value
         description =  "from {0} to {1} {2} * {3} = {4}".format(
             selected.encode('utf-8'),
             recipient.encode('utf-8'),
             times,
             current_value,
-            times * current_value)
+            total_value)
         logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER,
                                         desc=description))
     allocated[selected][:] = [
