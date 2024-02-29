@@ -2,6 +2,8 @@ from stv import DefaultQuotaCallback, Action, LOG_MESSAGE
 
 class QuotaCallback(DefaultQuotaCallback):
     """
+    Quota callback for constituencies fewer than seats.
+    
     Quota callback that overrules the quota when the number of constituencies
     is fewer than the number of seats. 
     """
