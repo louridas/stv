@@ -1,6 +1,10 @@
 from stv import DefaultQuotaCallback, Action, LOG_MESSAGE
 
 class QuotaCallback(DefaultQuotaCallback):
+    """
+    Quota callback that overrules the quota when the number of constituencies
+    is fewer than the number of seats. 
+    """
 
     def __init__(self, seats, quota_limit, logger):
         super().__init__(seats, quota_limit)
