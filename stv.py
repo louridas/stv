@@ -30,17 +30,39 @@
 # as representing official policies, either expressed or implied, of
 # GRNET S.A.
 
+import importlib
 import random
 import logging
 from enum import Enum
 import sys
-import math
 import csv
 import argparse
 
 SVT_LOGGER = 'SVT'
 LOGGER_FORMAT = '%(message)s'
 LOG_MESSAGE = "{action} {desc}"
+
+class DefaultQuotaCallback:
+    """Default callback for quota logic.
+
+    The DefaultQuotaCallback class implements the default quota logic.
+    If the elected candidate breaks the quota limit, without taking anything
+    else into consideration, the callback returns True, otherwise it returns False.
+    """
+    
+    def __init__(self, seats, quota_limit, logger=None):
+        self.seats = seats
+        self.quota_limit = quota_limit
+        self.logger = logger
+
+    def __call__(self,
+                 candidate=None, 
+                 constituency_map=None,
+                 elected_per_constituency=None):
+        current_constituency = constituency_map[candidate]
+        if elected_per_constituency[current_constituency] >= self.quota_limit:
+            return True
+        return False
 
 class Action(Enum):
     COUNT_ROUND = "@ROUND"
@@ -57,6 +79,7 @@ class Action(Enum):
     CONSTITUENCY_TURN = "#CONSTITUENCY_TURN"
     SHUFFLE = "xSHUFFLE"
     SORT = "/SORT"
+    COMMENT = "?COMMENT"
    
 class Ballot:
     """A ballot class for Single Transferable Voting.
@@ -66,14 +89,12 @@ class Ballot:
     weights. The index of the current holder of the ballot (for the
     first count and subsequent rounds) is also kept.
     """
-
-    candidates = []
-    weights = [1.0]
-    current_holder = 0
-    _value = 1
-
+    
     def __init__(self, candidates=[]):
         self.candidates = candidates
+        self.weights = [1.0]
+        self.current_holder = 0
+        self._value = 1.0
         
     def add_weight(self, weight):
         self.weights.append(weight)
@@ -196,15 +217,16 @@ def redistribute_ballots(selected, weight, hopefuls, allocated, vote_count):
         if x not in transferred
     ]
 
-def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
-                 current_round, elected, rejected, constituencies_elected):
+def elect_reject(candidate, vote_count, constituency_map,
+                 quota_limit, quota_callback,
+                 current_round, elected, rejected, elected_per_constituency):
     """Elects or rejects the candidate.
 
     Otherwise, if there are no quota limits, the candidate is elected.
     If there are quota limits, the candidate is either elected or
-    rejected, if the quota limits are exceeded. The elected and
-    rejected lists are modified accordingly, as well as the
-    constituencies_elected map.
+    rejected, depending on the quota limits and the quota_callback. 
+    The elected and rejected lists are modified accordingly, as well as 
+    the elected_per_constituency map.
 
     Returns true if the candidate is elected, false otherwise.
     """
@@ -212,26 +234,27 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
     
     logger = logging.getLogger(SVT_LOGGER)
     quota_exceeded = False
-    # If there is a quota limit, check if it is exceeded
-    if quota_limit > 0 and candidate in constituencies_map:
-        current_constituency = constituencies_map[candidate]
-        if constituencies_elected[current_constituency] >= quota_limit:
-            quota_exceeded = True
-    # If the quota limit has been exceeded, reject the candidate
+    # If there is a quota limit, check if it is exceeded.
+    if quota_limit > 0 and candidate in constituency_map:
+        quota_exceeded = quota_callback(candidate, 
+                                        constituency_map,
+                                        elected_per_constituency)
+    # If the quota limit has been exceeded, reject the candidate.
     if quota_exceeded:
         rejected.append((candidate, current_round, vote_count[candidate]))
+        current_constituency = constituency_map[candidate]
         d = (f'{candidate} {current_constituency} '
-             f'{constituencies_elected[current_constituency]} '
+             f'{elected_per_constituency[current_constituency]} '
              f'>= {quota_limit}')
         msg = LOG_MESSAGE.format(action=Action.QUOTA.value, desc=d)
         logger.info(msg)
         return False
-    # Otherwise, elect the candidate
+    # Otherwise, elect the candidate.
     else:
         elected.append((candidate, current_round, vote_count[candidate]))
-        if constituencies_map:
-            current_constituency = constituencies_map[candidate]
-            constituencies_elected[current_constituency] += 1
+        if constituency_map:
+            current_constituency = constituency_map[candidate]
+            elected_per_constituency[current_constituency] += 1
         d = candidate + " = " + str(vote_count[candidate])
         msg = LOG_MESSAGE.format(action=Action.ELECT.value, desc=d)
         logger.info(msg)
@@ -253,9 +276,10 @@ def count_description(vote_count, candidates):
                        for candidate, votes in count_results ])
 
 
-def elect_round_robin(vote_count, constituencies, constituencies_map,
-                      quota_limit, current_round, elected, rejected,
-                      constituencies_elected, seats, num_elected):
+def elect_round_robin(vote_count, constituencies, constituency_map,
+                      quota_limit, quota_callback,
+                      current_round, elected, rejected,
+                      elected_per_constituency, seats, num_elected):
     """Elects candidates going round robin around the orphan constituencies.
 
     If there are orphan constituencies, i.e., constituencies with no
@@ -266,10 +290,10 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
     """
 
     logger = logging.getLogger(SVT_LOGGER)
-    
+
     orphan_constituencies = [
         (constituency, sz) for constituency, sz in constituencies.items()
-        if constituencies_elected[constituency] == 0
+        if elected_per_constituency[constituency] == 0
     ]
     
     if len(orphan_constituencies) > 0:
@@ -284,7 +308,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
             # Get the vote count for the sorted orphan constituency.
             soc_vote_count = [
                 (candidate, count) for candidate, count in vote_count.items()
-                if constituencies_map[candidate] == soc
+                if constituency_map[candidate] == soc
             ]
             # Sort them by vote count, descending, so that we will be
             # able to use select_first_rnd on them.
@@ -316,25 +340,31 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                     soc_candidates_num -= 1
                 turn = (turn + 1) % len(orphan_constituencies)
             elect_reject(best_candidate, vote_count, 
-                         constituencies_map, quota_limit, 
+                         constituency_map, 
+                         quota_limit, 
+                         quota_callback,
                          current_round,
                          elected, rejected,
-                         constituencies_elected)
+                         elected_per_constituency)
             num_elected = len(elected)
     return num_elected
 
 def count_stv(ballots, seats,
               constituencies,
-              constituencies_map,
-              quota_limit = 0,
+              constituency_map,
+              quota_limit,
+              quota_callback,
               seed=None):
     """Performs a STV vote for the given ballots and number of seats.
 
     The constituencies argument is a map of constituencies to the
-    number of voters. The constituencies_map argument is a map of
+    number of voters. The constituency_map argument is a map of
     candidates to constituencies, if any. The quota_limit, if
     different than zero, is the limit of candidates that can be
-    elected by a constituency.
+    elected by a constituency. The quota_callback is a callable that
+    implements the quota logic. The seed is the random seed for the
+    random number generator. If seed is None, the random number
+    generator is not seeded.
     """
 
     random.seed(a=seed)
@@ -352,9 +382,9 @@ def count_stv(ballots, seats,
     # The candidates that have been eliminated because of quota restrictions.
     rejected = []
     # The number of candidates elected per constituency.
-    constituencies_elected = {}
-    for (candidate, constituency) in constituencies_map.items():
-        constituencies_elected[constituency] = 0
+    elected_per_constituency = {}
+    for (candidate, constituency) in constituency_map.items():
+        elected_per_constituency[constituency] = 0
         if candidate not in allocated:
             allocated[candidate] = []
         if candidate not in candidates: # check not really needed
@@ -391,7 +421,6 @@ def count_stv(ballots, seats,
                                        desc=current_round))
         # Log count.
         description  = count_description(vote_count, hopefuls)
-       
         logger.info(LOG_MESSAGE.format(action=Action.COUNT.value,
                                        desc=description))
         hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
@@ -406,11 +435,15 @@ def count_stv(ballots, seats,
                                               key=vote_count.get,
                                               action=Action.ELECT.value)
             hopefuls.remove(best_candidate)
-            was_elected = elect_reject(best_candidate, vote_count,
-                                       constituencies_map, quota_limit,
+            was_elected = elect_reject(best_candidate, 
+                                       vote_count,
+                                       constituency_map, 
+                                       quota_limit,
+                                       quota_callback,
                                        current_round, 
-                                       elected, rejected,
-                                       constituencies_elected)
+                                       elected, 
+                                       rejected,
+                                       elected_per_constituency)
             if not was_elected:
                 redistribute_ballots(best_candidate, 1.0,
                                      hopefuls, allocated, vote_count)
@@ -425,7 +458,7 @@ def count_stv(ballots, seats,
         # If nobody can get elected, take the least hopeful candidate
         # (i.e., the hopeful candidate with the fewer votes) and
         # redistribute that candidate's votes.
-        else:
+        else: # num_hopefuls > (seats -num_elected):
             hopefuls_sorted.reverse()
             worst_candidate = select_first_rnd(hopefuls_sorted,
                                                key=vote_count.get,
@@ -448,11 +481,12 @@ def count_stv(ballots, seats,
     if (seats - num_elected) > 0:
         num_elected = elect_round_robin(vote_count,
                                         constituencies,
-                                        constituencies_map,
-                                        quota_limit, 
+                                        constituency_map,
+                                        quota_limit,
+                                        quota_callback, 
                                         current_round,
                                         elected, rejected,
-                                        constituencies_elected,
+                                        elected_per_constituency,
                                         seats,
                                         num_elected)
  
@@ -466,10 +500,13 @@ def count_stv(ballots, seats,
                                        desc=description))
 
         best_candidate = eliminated.pop()
-        elect_reject(best_candidate, vote_count, 
-                     constituencies_map, quota_limit, 
+        elect_reject(best_candidate, 
+                     vote_count, 
+                     constituency_map, 
+                     quota_limit,
+                     quota_callback,
                      current_round,
-                     elected, rejected, constituencies_elected)
+                     elected, rejected, elected_per_constituency)
         current_round += 1
         num_elected = len(elected)
 
@@ -486,6 +523,9 @@ if __name__ == "__main__":
                         help='input constituencies file')    
     parser.add_argument('-q', '--quota', type=int, default=0,
                         dest='quota', help='constituency quota')
+    parser.add_argument('-m', '--quota_module',
+                        dest='quota_module',
+                        help='quota module callback')
     parser.add_argument('-r', '--random', dest='random_seed',
                         type=str,
                         help='random seed')
@@ -511,7 +551,7 @@ if __name__ == "__main__":
     if args.seats == 0:
         args.seats = len(ballots) / 2
 
-    constituencies_map = {}
+    constituency_map = {}
     constituencies = {}
     if args.constituencies_file:
         with open(args.constituencies_file) as constituencies_file:
@@ -524,13 +564,22 @@ if __name__ == "__main__":
                  constituency_size = int(constituency[1])
                  constituencies[constituency_name] = constituency_size
                  for candidate in constituency[2:]:
-                     constituencies_map[candidate] = constituency_name
+                     constituency_map[candidate] = constituency_name
 
+    if args.quota_module:
+        module = importlib.import_module(args.quota_module)
+        cls = getattr(module, "QuotaCallback")
+        quota_callback = cls(args.seats, args.quota, logger=logger)
+    else:
+        quota_callback = DefaultQuotaCallback(args.seats, 
+                                              args.quota, 
+                                              logger=logger)
     (elected, vote_count) = count_stv(ballots,
                                       args.seats,
                                       constituencies,
-                                      constituencies_map,
+                                      constituency_map,
                                       args.quota,
+                                      quota_callback,
                                       args.random_seed)
 
     print("Results:")
