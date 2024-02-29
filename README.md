@@ -56,6 +56,11 @@ to size breaking ties.
 
 The logging level, which can be either DEBUG or INFO (the default).
 
+* `-m QUOTA_MODULE, --quota_module QUOTA_MODULE`
+
+A file containing custom quota logic. It must implement a class
+inheriting from `DefaultQuotaCallback`.
+
 For an invocation like:
 
     stv.py --ballots ballots.csv --constituencies constituencies.csv --seats 6 --quota 2 -l DEBUG
@@ -133,3 +138,7 @@ broken randomly.
     #CONSTITUENCY_TURN constituency [ (candidate1, vote1), (candidate2, vote2), ... ]
     
 The constituency currently selected in round robin fashion.
+
+    ?COMMENT 
+
+Log a comment on the process.
