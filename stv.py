@@ -38,6 +38,7 @@ from enum import Enum
 import sys
 import csv
 import argparse
+import json
 
 SVT_LOGGER = 'SVT'
 LOGGER_FORMAT = '%(message)s'
@@ -52,10 +53,10 @@ class DefaultQuotaCallback:
     otherwise it returns False.
     """
     
-    def __init__(self, seats, quota_limit, logger=None):
+    def __init__(self, seats, quota_limit, kw_args):
         self.seats = seats
         self.quota_limit = quota_limit
-        self.logger = logger
+        self.logger = kw_args['logger']
 
     def __call__(self,
                  candidate, 
@@ -543,6 +544,7 @@ if __name__ == "__main__":
                         help='random seed')
     parser.add_argument('-l', '--loglevel', default=logging.INFO,
                         dest='loglevel', help='logging level')
+    parser.add_argument("--extra_args", type=json.loads)    
     args = parser.parse_args()
 
     stream_handler = logging.StreamHandler(stream=sys.stdout)
@@ -578,14 +580,16 @@ if __name__ == "__main__":
                  for candidate in constituency[2:]:
                      constituency_map[candidate] = constituency_name
 
+    kw_args = {'logger': logger}                     
     if args.quota_module:
+        kw_args.update(args.extra_args['quota'])
         module = importlib.import_module(args.quota_module)
         cls = getattr(module, "QuotaCallback")
-        quota_callback = cls(args.seats, args.quota, logger=logger)
+        quota_callback = cls(args.seats, args.quota, kw_args)
     else:
         quota_callback = DefaultQuotaCallback(args.seats, 
                                               args.quota, 
-                                              logger=logger)
+                                              kw_args)
     (elected, vote_count) = count_stv(ballots,
                                       args.seats,
                                       constituencies,
@@ -601,10 +605,3 @@ if __name__ == "__main__":
     for ballot in ballots:
         ballot_holder = ballot.candidates[ballot.current_holder]
         ballot_allocation[ballot_holder] += ballot.get_value()
-    # total_sum = 0
-    # for candidate, allocated_ballots in sorted(ballot_allocation.items(), 
-    #                                            key=lambda item: item[1]):
-    #     print(candidate, allocated_ballots)
-    #     total_sum += allocated_ballots
-    # print('***', total_sum)
-    # print(len(ballots))

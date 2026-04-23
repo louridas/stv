@@ -61,6 +61,15 @@ The logging level, which can be either DEBUG or INFO (the default).
 A file containing custom quota logic. It must implement a class
 inheriting from `DefaultQuotaCallback`.
 
+* `--extra_args EXTRA_ARGS`
+
+Extra arguments, JSON dictionary form, to be passed to the program.
+For example, if we want to use
+`quota_callback_fewer_constituencies.py` we have to pass a higher
+quota. We do that with:
+
+    python stv.py -s 6 -c constituencies.csv -b ballots.csv -q 1 -m quota_callback_fewer_constituencies --extra_args '{"quota": { "higher_quota" : 2 } }'
+
 For an invocation like:
 
     stv.py --ballots ballots.csv --constituencies constituencies.csv --seats 6 --quota 2 -l DEBUG
