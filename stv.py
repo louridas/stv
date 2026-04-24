@@ -373,7 +373,8 @@ def elect_round_robin(vote_count, constituencies, constituency_map,
             num_elected = len(elected)
     return num_elected
 
-def count_stv(ballots, seats,
+def count_stv(ballots,
+              seats,
               constituencies,
               constituency_map,
               quota_limit,
@@ -608,8 +609,4 @@ if __name__ == "__main__":
 
     print("Results:")
     for result in elected:
-        print(result)
-    ballot_allocation = defaultdict(float)
-    for ballot in ballots:
-        ballot_holder = ballot.candidates[ballot.current_holder]
-        ballot_allocation[ballot_holder] += ballot.get_value()
+        print(result, constituency_map[result[0]])
