@@ -31,7 +31,6 @@
 # GRNET S.A.
 
 from collections import defaultdict
-import importlib
 import random
 import logging
 from enum import Enum
@@ -44,29 +43,48 @@ SVT_LOGGER = 'SVT'
 LOGGER_FORMAT = '%(message)s'
 LOG_MESSAGE = "{action} {desc}"
 
-class DefaultQuotaCallback:
-    """Default callback for quota logic.
+class QuotaCallback:
+    """Quota callback for checking that a candidate can be elected.
 
-    The DefaultQuotaCallback class implements the default quota logic.
-    If the elected candidate breaks the quota limit, without taking
-    anything else into consideration, the callback returns True,
-    otherwise it returns False.
+    A candidate can be elected if the constituency quota is not
+    breached, unless there are fewer constituencies than seats.
+
     """
-    
-    def __init__(self, seats, quota_limit, kw_args):
+
+    def __init__(self, seats, quota_limit, logger):
+
         self.seats = seats
         self.quota_limit = quota_limit
-        self.logger = kw_args['logger']
+        self.higher_quota_limit = self.quota_limit + 1
+        self.num_overruled = 0
+        self.logger = logger
 
     def __call__(self,
-                 candidate, 
+                 candidate,
                  constituency_map,
                  elected_per_constituency):
-        current_constituency = constituency_map[candidate]
-        if elected_per_constituency[current_constituency] >= self.quota_limit:
-            return True
-        return False
 
+        diff = self.seats - len(set(constituency_map.values()))
+        constituency = constituency_map[candidate]
+        num_elected = elected_per_constituency[constituency]
+
+        if num_elected < self.quota_limit:
+            return False
+        
+        if (diff > 0 # excess seats
+            and self.num_overruled < diff # still excess seats remaining
+            and num_elected < self.higher_quota_limit): 
+            self.num_overruled += 1
+            d = ("Quota overruled. Constituencies fewer than seats.")
+            msg = LOG_MESSAGE.format(action=Action.COMMENT.value, desc=d)
+            self.logger.info(msg)
+            return False
+
+        if elected_per_constituency[constituency] >= self.quota_limit:
+            return True
+        
+        return False
+    
 class Action(Enum):
     COUNT_ROUND = "@ROUND"
     TRANSFER = ">TRANSFER"
@@ -105,7 +123,7 @@ class Ballot:
 
     def get_value(self):
         return self._value
- 
+    
 def select_first_rnd(sequence, key, action):
     """Selects the first item in a sorted sequence breaking ties randomly.
 
@@ -536,9 +554,6 @@ if __name__ == "__main__":
                         help='input constituencies file')    
     parser.add_argument('-q', '--quota', type=int, default=0,
                         dest='quota', help='constituency quota')
-    parser.add_argument('-m', '--quota_module',
-                        dest='quota_module',
-                        help='quota module callback')
     parser.add_argument('-r', '--random', dest='random_seed',
                         type=str,
                         help='random seed')
@@ -580,16 +595,9 @@ if __name__ == "__main__":
                  for candidate in constituency[2:]:
                      constituency_map[candidate] = constituency_name
 
-    kw_args = {'logger': logger}                     
-    if args.quota_module:
-        kw_args.update(args.extra_args['quota'])
-        module = importlib.import_module(args.quota_module)
-        cls = getattr(module, "QuotaCallback")
-        quota_callback = cls(args.seats, args.quota, kw_args)
-    else:
-        quota_callback = DefaultQuotaCallback(args.seats, 
-                                              args.quota, 
-                                              kw_args)
+    quota_callback = QuotaCallback(args.seats, 
+                                   args.quota, 
+                                   logger)
     (elected, vote_count) = count_stv(ballots,
                                       args.seats,
                                       constituencies,
