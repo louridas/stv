@@ -35,6 +35,7 @@ from __future__ import division
 from __future__ import absolute_import
 import random
 import logging
+from enum import Enum
 import sys
 import math
 import csv
@@ -59,7 +60,7 @@ def utf_8_encoder(unicode_csv_data):
     for line in unicode_csv_data:
         yield line.encode('utf-8')
 
-class Action(object):
+class Action(Enum):
     COUNT_ROUND = "@ROUND"
     TRANSFER = ">TRANSFER"
     ELIMINATE = "-ELIMINATE"
@@ -137,7 +138,7 @@ def select_first_rnd(sequence, key, action, logger=LOGGER):
                 selected.encode('utf-8'), 
                 ', '.join([c.encode('utf-8') for c in collected]), 
                 action)
-        logger.info(LOG_MESSAGE.format(action=Action.RANDOM, desc=description))
+        logger.info(LOG_MESSAGE.format(action=Action.RANDOM.value, desc=description))
     return selected
 
 def sort_rnd(sequence, key, reverse, logger=LOGGER):
@@ -158,7 +159,7 @@ def sort_rnd(sequence, key, reverse, logger=LOGGER):
     shuffled_str = stringify_tuples_sequence(sequence)
     description += shuffled_str
     description += ']'
-    logger.info(LOG_MESSAGE.format(action=Action.SHUFFLE,
+    logger.info(LOG_MESSAGE.format(action=Action.SHUFFLE.value,
                                    desc=description))
     description = 'from [' + shuffled_str
     description += '] to ['
@@ -168,7 +169,7 @@ def sort_rnd(sequence, key, reverse, logger=LOGGER):
         reverse=reverse)
     description += stringify_tuples_sequence(sorted_sequence)
     description += ']'
-    logger.info(LOG_MESSAGE.format(action=Action.SORT, desc=description))
+    logger.info(LOG_MESSAGE.format(action=Action.SORT.value, desc=description))
     return sorted_sequence
 
 def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
@@ -225,7 +226,7 @@ def redistribute_ballots(selected, transfer_volume, hopefuls, allocated,
             times,
             transfer_unit,
             transfer_value)
-        logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER,
+        logger.debug(LOG_MESSAGE.format(action=Action.TRANSFER.value,
                                         desc=description))
         
     allocated[selected][:] = [
@@ -261,7 +262,7 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
             current_constituency.encode('utf-8'),
             constituencies_elected[current_constituency], 
             quota_limit)
-        msg = LOG_MESSAGE.format(action=Action.QUOTA, desc=d)
+        msg = LOG_MESSAGE.format(action=Action.QUOTA.value, desc=d)
         logger.info(msg)
         return False
     # Otherwise, elect the candidate
@@ -271,7 +272,7 @@ def elect_reject(candidate, vote_count, constituencies_map, quota_limit,
             current_constituency = constituencies_map[candidate]
             constituencies_elected[current_constituency] += 1
         d = candidate.encode('utf-8') + " = " + str(vote_count[candidate])
-        msg = LOG_MESSAGE.format(action=Action.ELECT, desc=d)
+        msg = LOG_MESSAGE.format(action=Action.ELECT.value, desc=d)
         logger.info(msg)
         return True
 
@@ -334,7 +335,7 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                 ', '.join([ "(" + c.encode('utf-8') + ", " + str(v) + ")" 
                            for c, v in sorted_orphan_constituencies ]) +
                 ']')
-        logger.info(LOG_MESSAGE.format(action=Action.ROUND_ROBIN,
+        logger.info(LOG_MESSAGE.format(action=Action.ROUND_ROBIN.value,
                                        desc=desc))
         while (seats - num_elected) > 0 and soc_candidates_num > 0:
             best_candidate = None
@@ -345,13 +346,13 @@ def elect_round_robin(vote_count, constituencies, constituencies_map,
                     constituency_turn.encode('utf-8'), 
                     stringify_tuples_sequence(candidates_turn)
                 )
-                logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN,
+                logger.info(LOG_MESSAGE.format(action=Action.CONSTITUENCY_TURN.value,
                                                desc=desc))
                 if len(candidates_turn) > 0:
                     best_candidate_vote = select_first_rnd(
                         candidates_turn,
                         key=lambda item: item[1],
-                        action=Action.ELECT)
+                        action=Action.ELECT.value)
                     best_candidate = best_candidate_vote[0]
                     candidates_turn.remove(best_candidate_vote)
                     soc_candidates_num -= 1
@@ -381,7 +382,7 @@ def count_stv(ballots, seats,
 
     random.seed(a=seed)
     logger = logger or logging.getLogger(SVT_LOGGER)
-    logger.info(LOG_MESSAGE.format(action=Action.SEED,
+    logger.info(LOG_MESSAGE.format(action=Action.SEED.value,
                                    desc=seed))
     
     allocated = {} # The allocation of ballots to candidates.
@@ -405,7 +406,7 @@ def count_stv(ballots, seats,
 
     threshold = int(len(ballots) / (seats + 1.0)) + 1
 
-    logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD,
+    logger.info(LOG_MESSAGE.format(action=Action.THRESHOLD.value,
                                    desc=threshold))
     
     # Do initial count.
@@ -429,11 +430,11 @@ def count_stv(ballots, seats,
     num_hopefuls = len(hopefuls)    
     while num_elected < seats and num_hopefuls > 0:
         # Log round.
-        logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
+        logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND.value,
                                        desc=current_round))
         # Log count.
         description  = count_description(vote_count, hopefuls)
-        logger.info(LOG_MESSAGE.format(action=Action.COUNT,
+        logger.info(LOG_MESSAGE.format(action=Action.COUNT.value,
                                        desc=description))
         hopefuls_sorted = sorted(hopefuls, key=vote_count.get, reverse=True )
         # If there is a surplus record it, so that we can try to
@@ -446,7 +447,7 @@ def count_stv(ballots, seats,
         if surplus >= 0:
             best_candidate = select_first_rnd(hopefuls_sorted,
                                               key=vote_count.get,
-                                              action=Action.ELECT,
+                                              action=Action.ELECT.value,
                                               logger=logger)
             hopefuls.remove(best_candidate)
             was_elected = elect_reject(best_candidate, vote_count,
@@ -470,13 +471,13 @@ def count_stv(ballots, seats,
             hopefuls_sorted.reverse()
             worst_candidate = select_first_rnd(hopefuls_sorted,
                                                key=vote_count.get,
-                                               action=Action.ELIMINATE,
+                                               action=Action.ELIMINATE.value,
                                                logger=logger)
             hopefuls.remove(worst_candidate)
             eliminated.append(worst_candidate)
             desc = '{0} = {1}'.format(worst_candidate.encode('utf-8'),
                                       vote_count[worst_candidate])
-            msg = LOG_MESSAGE.format(action=Action.ELIMINATE, desc=desc)
+            msg = LOG_MESSAGE.format(action=Action.ELIMINATE.value, desc=desc)
             logger.info(msg)
             if received > 0:
                 redistribute_ballots(worst_candidate, 1.0, hopefuls, allocated,
@@ -503,10 +504,10 @@ def count_stv(ballots, seats,
     # If there is either a candidate with surplus votes, or
     # there are hopeful candidates beneath the threshold.
     while (seats - num_elected) > 0 and len(eliminated) > 0:
-        logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND,
+        logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND.value,
                                        desc=current_round))
         description  = count_description(vote_count, eliminated)        
-        logger.info(LOG_MESSAGE.format(action=Action.ZOMBIES,
+        logger.info(LOG_MESSAGE.format(action=Action.ZOMBIES.value,
                                        desc=description))
 
         best_candidate = eliminated.pop()
