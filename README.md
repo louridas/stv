@@ -133,3 +133,7 @@ broken randomly.
     #CONSTITUENCY_TURN constituency [ (candidate1, vote1), (candidate2, vote2), ... ]
     
 The constituency currently selected in round robin fashion.
+
+    ?COMMENT 
+
+Log a comment on the process.
