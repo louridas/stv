@@ -4,6 +4,10 @@ This is a pure Python implementation of Simple Transferable Vote (STV)
 counting. It also implements the version of STV used in the
 elections of the Greek university governing councils.
 
+This branch targets Python 2.7. Install runtime dependencies with:
+
+    pip install -r requirements.txt
+
 # Usage
 
 Help is available with
