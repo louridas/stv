@@ -30,7 +30,6 @@
 # as representing official policies, either expressed or implied, of
 # GRNET S.A.
 
-from collections import defaultdict
 import random
 import logging
 from enum import Enum
