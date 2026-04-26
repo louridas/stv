@@ -275,7 +275,7 @@ def redistribute_ballots(selected, weight, hopefuls, allocated,
         else:
             vote_count[recipient] = total_value
         vote_count[selected] -= total_value
-        description =  "from {0} to {1} {2} * {3} = {4}".format(
+        description =  "from {0} to {1}: {2} * {3} = {4}".format(
             selected.encode('utf-8'),
             recipient.encode('utf-8'),
             times,
