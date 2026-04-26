@@ -496,7 +496,7 @@ def count_stv(ballots,
     current_round = 1
     num_elected = len(elected)
     num_hopefuls = len(hopefuls)
-    while num_elected < seats and num_hopefuls > (seats - num_elected):
+    while num_elected < seats and num_hopefuls > 0:
         # Log round.
         logger.info(LOG_MESSAGE.format(action=Action.COUNT_ROUND.value,
                                        desc=current_round))
