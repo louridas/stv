@@ -50,29 +50,30 @@ class QuotaCallback:
 
     """
 
-    def __init__(self, seats, quota_limit, logger):
+    def __init__(self, seats, quota_limit, constituency_map, logger):
 
         self.seats = seats
         self.quota_limit = quota_limit
         self.higher_quota_limit = self.quota_limit + 1
+        self.constituency_map = constituency_map
+        self.num_constituencies = len(set(self.constituency_map.values()))
         self.num_overruled = 0
+        self.diff = self.seats - (self.num_constituencies * self.quota_limit)
         self.logger = logger
 
     def __call__(self,
                  candidate,
-                 constituency_map,
                  elected_per_constituency):
 
-        diff = self.seats - len(set(constituency_map.values()))
-        constituency = constituency_map[candidate]
+        constituency = self.constituency_map[candidate]
         num_elected = elected_per_constituency[constituency]
 
         if num_elected < self.quota_limit:
             return False
-        
-        if (diff > 0 # excess seats
-            and self.num_overruled < diff # still excess seats remaining
-            and num_elected < self.higher_quota_limit): 
+
+        if (self.diff > 0 # excess seats
+            and self.num_overruled < self.diff # still excess seats remaining
+            and num_elected < self.higher_quota_limit):
             self.num_overruled += 1
             d = ("Quota overruled. Constituencies fewer than seats.")
             msg = LOG_MESSAGE.format(action=Action.COMMENT.value, desc=d)
@@ -257,8 +258,7 @@ def elect_reject(candidate, vote_count, constituency_map,
     quota_exceeded = False
     # If there is a quota limit, check if it is exceeded.
     if quota_limit > 0 and candidate in constituency_map:
-        quota_exceeded = quota_callback(candidate, 
-                                        constituency_map,
+        quota_exceeded = quota_callback(candidate,
                                         elected_per_constituency)
     # If the quota limit has been exceeded, reject the candidate.
     if quota_exceeded:
@@ -595,8 +595,9 @@ if __name__ == "__main__":
                  for candidate in constituency[2:]:
                      constituency_map[candidate] = constituency_name
 
-    quota_callback = QuotaCallback(args.seats, 
-                                   args.quota, 
+    quota_callback = QuotaCallback(args.seats,
+                                   args.quota,
+                                   constituency_map,
                                    logger)
     (elected, vote_count) = count_stv(ballots,
                                       args.seats,
