@@ -543,6 +543,21 @@ def count_stv(ballots,
 
     return elected, vote_count
 
+# Opens file with the proper encoding
+def auto_open(filename):
+    try:
+        temp = open(filename, encoding='utf-8', errors='strict')
+        for line in temp:
+            pass
+        #print("UTF-8 file detected, opening as UTF-8")
+        opened_file = open(filename, encoding='utf-8')
+        return opened_file
+    except UnicodeDecodeError:
+        #print("ANSI file detected, opening as ANSI")
+        opened_file = open(filename)
+        return opened_file
+    
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Perform STV')
     parser.add_argument('-b', '--ballots', default='sys.stdin',
@@ -570,7 +585,7 @@ if __name__ == "__main__":
     ballots = []
     ballots_file = sys.stdin
     if args.ballots_file != 'sys.stdin':
-        ballots_file = open(args.ballots_file)
+        ballots_file = auto_open(args.ballots_file)
     ballots_reader = csv.reader(ballots_file, delimiter=',',
                                 quotechar='"',
                                 skipinitialspace=True)
@@ -583,17 +598,16 @@ if __name__ == "__main__":
     constituency_map = {}
     constituencies = {}
     if args.constituencies_file:
-        with open(args.constituencies_file) as constituencies_file:
-             constituencies_reader = csv.reader(constituencies_file,
-                                                    delimiter=',',
-                                                    quotechar='"',
-                                                    skipinitialspace=True)
-             for constituency in constituencies_reader:
-                 constituency_name = constituency[0]
-                 constituency_size = int(constituency[1])
-                 constituencies[constituency_name] = constituency_size
-                 for candidate in constituency[2:]:
-                     constituency_map[candidate] = constituency_name
+        constituencies_reader = csv.reader(auto_open(args.constituencies_file),
+                                               delimiter=',',
+                                               quotechar='"',
+                                               skipinitialspace=True)
+        for constituency in constituencies_reader:
+            constituency_name = constituency[0]
+            constituency_size = int(constituency[1])
+            constituencies[constituency_name] = constituency_size
+            for candidate in constituency[2:]:
+                constituency_map[candidate] = constituency_name
 
     quota_callback = QuotaCallback(args.seats,
                                    args.quota,
